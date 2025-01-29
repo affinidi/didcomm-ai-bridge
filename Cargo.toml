@@ -1,0 +1,14 @@
+[package]
+name = "didcomm-ollama"
+description = "A bridge between DIDComm and Ollama. Privately chat with your own AI Agents"
+version = "0.1.0"
+edition = "2021"
+authors = ["Glenn Gore <glenn@affinidi.com>"]
+readme = "README.md"
+homepage = "https://affinidi.com/"
+license = "Apache-2.0"
+keywords = ["ssi", "ATM", "affinidi", "DIDComm", "AI", "Ollama"]
+repository = "https://github.com/affinidi/didcomm-ollama"
+
+[dependencies]
+ollama-rs = "0.2"
