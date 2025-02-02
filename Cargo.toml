@@ -1,6 +1,6 @@
 [package]
 name = "didcomm-ollama"
-description = "A bridge between DIDComm and Ollama. Privately chat with your own AI Agents"
+description = "A DIDComm bridge for Ollama"
 version = "0.1.0"
 edition = "2021"
 authors = ["Glenn Gore <glenn@affinidi.com>"]
@@ -9,6 +9,37 @@ homepage = "https://affinidi.com/"
 license = "Apache-2.0"
 keywords = ["ssi", "ATM", "affinidi", "DIDComm", "AI", "Ollama"]
 repository = "https://github.com/affinidi/didcomm-ollama"
+publish = true
 
 [dependencies]
-ollama-rs = "0.2"
+affinidi-messaging-didcomm = "0.9"
+affinidi-messaging-sdk = "0.9"
+anyhow = "1.0"
+base64 = "0.22"
+clap = { version = "4.5", features = ["derive"] }
+console = "0.15"
+dialoguer = "0.11"
+did-peer = "0.2"
+keyring = { version = "3.6", features = [
+    "apple-native",
+    "windows-native",
+    "sync-secret-service",
+] }
+ollama-rs = { version = "0.2", features = ["stream"] }
+regex = "1.11"
+serde = "1.0"
+serde_json = "1.0"
+sha256 = "1.5"
+ssi = { version = "0.10", features = ["secp384r1"] }
+tokio = { version = "1.43", features = ["full"] }
+tokio-stream = "0.1"
+tracing = { version = "0.1", features = [
+    "max_level_debug",
+    "release_max_level_info",
+] }
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "fmt",
+    "json",
+] }
+uuid = { version = "1.12", features = ["v4", "fast-rng"] }
