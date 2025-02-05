@@ -11,15 +11,14 @@ use crate::{
     agents::model::{ModelAction, ModelAgent},
     chat_messages::send_message,
     config::OllamaModel,
-    didcomm_messages::{handle_presence, oob_connection::send_connection_response},
+    didcomm_messages::{
+        clear_messages::clear_inbound_messages, handle_presence,
+        oob_connection::send_connection_response,
+    },
     termination::{Interrupted, Terminator},
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
-use affinidi_messaging_sdk::{
-    messages::{fetch::FetchOptions, FetchDeletePolicy},
-    profiles::Profile,
-    ATM,
-};
+use affinidi_messaging_sdk::{profiles::Profile, ATM};
 use anyhow::Result;
 use tokio::{
     select,
@@ -78,17 +77,7 @@ impl Concierge {
         mut interrupt_rx: broadcast::Receiver<Interrupted>,
     ) -> Result<Interrupted> {
         let profile = self.atm.profile_add(&profile, false).await?;
-
-        // Clear out the inbox queue in case old questions have been queued up
-        self.atm
-            .fetch_messages(
-                &profile,
-                &FetchOptions {
-                    delete_policy: FetchDeletePolicy::Optimistic,
-                    ..Default::default()
-                },
-            )
-            .await?;
+        let _ = clear_inbound_messages(&self.atm, &profile).await;
 
         // Start live streaming
         self.atm.profile_enable_websocket(&profile).await?;
@@ -132,7 +121,8 @@ impl Concierge {
                 }
             },
                 Some(boxed_data) = direct_rx.recv() => {
-                        let (message, _) = *boxed_data;
+                        let (message, meta) = *boxed_data;
+                        let _ = self.atm.delete_message_background(&profile, &meta.sha256_hash).await;
 
                         if message.type_ == "https://affinidi.com/atm/client-actions/connection-setup" {
                             info!("Concierge Received Connection Setup Message: {:#?}", message);

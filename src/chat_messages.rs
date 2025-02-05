@@ -53,7 +53,6 @@ pub(crate) async fn handle_message(
             "{}",
             style("How would one respond to an anonymous message?").red()
         );
-        let _ = atm.delete_message_background(profile, &message.id).await;
         return Err(anyhow::anyhow!("No 'from' field in message"));
     };
 
@@ -62,7 +61,6 @@ pub(crate) async fn handle_message(
             "{}",
             style(format!("Unknown message type: {:?}", message)).red()
         );
-        let _ = atm.delete_message_background(profile, &message.id).await;
         return Err(anyhow::anyhow!("Unknown message type"));
     };
 
@@ -155,7 +153,6 @@ pub(crate) async fn handle_message(
             println!("Received message: {:?}", message);
         }
     }
-    let _ = atm.delete_message_background(profile, &message.id).await;
     Ok(())
 }
 
@@ -171,7 +168,6 @@ pub(crate) async fn handle_chat_effect(
             "{}",
             style("How would one respond to an anonymous message?").red()
         );
-        let _ = atm.delete_message_background(profile, &message.id).await;
         return;
     };
 
@@ -206,11 +202,8 @@ pub(crate) async fn handle_chat_effect(
                 "{}",
                 style(format!("Error parsing chat message: {:?}", e)).red()
             );
-            return;
         }
     }
-
-    let _ = atm.delete_message_background(profile, &message.id).await;
 }
 
 /// Handles a prompt message
@@ -359,7 +352,6 @@ async fn ack_message(atm: &ATM, profile: &Arc<Profile>, message: &Message) -> Re
             "{}",
             style("How would one respond to an anonymous message?").red()
         );
-        let _ = atm.delete_message_background(profile, &message.id).await;
         return Err(anyhow::anyhow!("No 'from' field in message"));
     };
 

@@ -7,17 +7,11 @@
 use std::sync::Arc;
 
 use crate::{
-    chat_messages::{handle_chat_effect, handle_message, send_message},
-    config::OllamaModel,
-    didcomm_messages::{handle_presence, oob_connection::send_connection_response},
-    termination::Interrupted,
+    chat_messages::handle_message, config::OllamaModel,
+    didcomm_messages::clear_messages::clear_inbound_messages, termination::Interrupted,
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
-use affinidi_messaging_sdk::{
-    messages::{fetch::FetchOptions, FetchDeletePolicy},
-    profiles::Profile,
-    ATM,
-};
+use affinidi_messaging_sdk::{profiles::Profile, ATM};
 use anyhow::Result;
 use tokio::{
     select,
@@ -79,18 +73,7 @@ impl ModelAgent {
     /// Run the Model Agent
     async fn run(mut self, profile: Arc<Profile>) -> Result<Interrupted> {
         info!("Model ({}) starting...", self.model.name);
-        // Clear out the inbox queue in case old questions have been queued up
-        self.atm
-            .fetch_messages(
-                &profile,
-                &FetchOptions {
-                    delete_policy: FetchDeletePolicy::Optimistic,
-                    ..Default::default()
-                },
-            )
-            .await?;
-
-        info!("Model ({}) emptied queues", self.model.name);
+        let _ = clear_inbound_messages(&self.atm, &profile).await;
 
         // Start live streaming
         self.atm.profile_enable_websocket(&profile).await?;
@@ -110,12 +93,15 @@ impl ModelAgent {
                 },
             },
                 Some(boxed_data) = direct_rx.recv() => {
-                        let (message, _) = *boxed_data;
+                        let (message, meta) = *boxed_data;
 
                        let _ = handle_message(&self.atm, &profile, &self.model, &message).await;
+                       let _ = self.atm.delete_message_background(&profile, &meta.sha256_hash).await;
                 },
             }
         };
+
+        info!("{}: Exiting Model Agent", self.model.name);
 
         Ok(result)
     }

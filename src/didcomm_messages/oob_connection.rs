@@ -143,7 +143,5 @@ pub async fn send_connection_response(
         Err(e) => warn!("Error Sending Connection Response: {:#?}", e),
     }
 
-    let _ = atm.delete_message_background(profile, &message.id).await;
-
     Ok(new_did)
 }

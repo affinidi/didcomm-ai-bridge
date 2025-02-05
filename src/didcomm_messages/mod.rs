@@ -6,6 +6,7 @@ use serde_json::json;
 use std::{sync::Arc, time::SystemTime};
 use tracing::warn;
 
+pub mod clear_messages;
 pub mod oob_connection;
 
 pub async fn handle_presence(atm: &ATM, profile: &Arc<Profile>, message: &Message) {
@@ -15,7 +16,6 @@ pub async fn handle_presence(atm: &ATM, profile: &Arc<Profile>, message: &Messag
             "{}",
             style("How would one respond to an anonymous message?").red()
         );
-        let _ = atm.delete_message_background(profile, &message.id).await;
         return;
     };
 
@@ -80,6 +80,4 @@ pub async fn handle_presence(atm: &ATM, profile: &Arc<Profile>, message: &Messag
         Ok(_) => {}
         Err(e) => warn!("Error Sending Presence: {:#?}", e),
     }
-
-    let _ = atm.delete_message_background(profile, &message.id).await;
 }
