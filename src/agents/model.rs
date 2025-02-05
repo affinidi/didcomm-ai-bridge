@@ -7,9 +7,9 @@
 use std::sync::Arc;
 
 use crate::{
-    chat_messages::{handle_message, send_message},
+    chat_messages::{handle_chat_effect, handle_message, send_message},
     config::OllamaModel,
-    didcomm_messages::oob_connection::send_connection_response,
+    didcomm_messages::{handle_presence, oob_connection::send_connection_response},
     termination::Interrupted,
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
@@ -112,20 +112,7 @@ impl ModelAgent {
                 Some(boxed_data) = direct_rx.recv() => {
                         let (message, _) = *boxed_data;
 
-                        if message.type_ == "https://affinidi.com/atm/client-actions/connection-setup" {
-                            info!("Concierge Received Connection Setup Message: {:#?}", message);
-                            let new_did = send_connection_response(&self.atm, &profile, &message).await?;
-                            let _ = send_message(
-                                &self.atm,
-                                &profile,
-                                "First Message from a very intelligent concierge",
-                                &new_did,
-                            )
-                            .await;
-                        } else {
-                        info!("Model received message: {:?}", message);
-                       handle_message(&self.atm, &profile, &self.model, &message).await;
-                        }
+                       let _ = handle_message(&self.atm, &profile, &self.model, &message).await;
                 },
             }
         };

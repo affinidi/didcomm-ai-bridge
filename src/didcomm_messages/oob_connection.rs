@@ -98,7 +98,12 @@ pub async fn send_connection_response(
     .thid(message.thid.clone().unwrap())
     .to(message.from.clone().unwrap())
     .attachment(attachment)
-    .created_time(SystemTime::now().elapsed().unwrap().as_secs())
+    .created_time(
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+    )
     .finalize();
 
     let packed = atm
@@ -137,6 +142,8 @@ pub async fn send_connection_response(
         Ok(_) => info!("Connection Response Sent"),
         Err(e) => warn!("Error Sending Connection Response: {:#?}", e),
     }
+
+    let _ = atm.delete_message_background(profile, &message.id).await;
 
     Ok(new_did)
 }

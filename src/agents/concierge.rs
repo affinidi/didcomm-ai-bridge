@@ -11,7 +11,7 @@ use crate::{
     agents::model::{ModelAction, ModelAgent},
     chat_messages::send_message,
     config::OllamaModel,
-    didcomm_messages::oob_connection::send_connection_response,
+    didcomm_messages::{handle_presence, oob_connection::send_connection_response},
     termination::{Interrupted, Terminator},
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
@@ -144,6 +144,9 @@ impl Concierge {
                                 &new_did,
                             )
                             .await;
+                        } else if message.type_ ==  "https://affinidi.com/atm/client-actions/chat-presence" {
+                            // Send a presence response back
+                            handle_presence(&self.atm, &profile, &message).await;
                         } else {
                             info!("Concierge Received Message: {:#?}", message);
                             let _ = send_message(
