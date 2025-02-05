@@ -1,26 +1,32 @@
-use crate::config::{Config, OllamaModel};
 use anyhow::{anyhow, Result};
 use console::style;
-use dialoguer::{theme::ColorfulTheme, Input, MultiSelect};
+use dialoguer::{theme::ColorfulTheme, Input, MultiSelect, Select};
+use didcomm_ollama::{
+    config::{Config, OllamaModel},
+    create_did, DIDMethods,
+};
 use ollama_rs::Ollama;
 use regex::Regex;
 
 pub(crate) async fn run_setup_wizard() -> Result<Config> {
     println!();
     println!("{}", style("Running setup wizard").green());
+    let mediator_did = get_mediator_did()?;
+    let did_method = get_did_method()?;
     let mut config = Config {
-        mediator_did: get_mediator_did()?,
+        concierge_did: create_did(&did_method, &mediator_did)?,
+        mediator_did,
         ..Default::default()
     };
 
-    add_new_model(&mut config).await?;
+    add_new_model(&mut config, &did_method).await?;
 
     Ok(config)
 }
 
-pub(crate) async fn add_new_model(config: &mut Config) -> Result<()> {
+pub(crate) async fn add_new_model(config: &mut Config, did_method: &DIDMethods) -> Result<()> {
     let (address, port) = get_ollama_address()?;
-    add_ollama_models(&address, port, config).await?;
+    add_ollama_models(&address, port, config, did_method).await?;
 
     Ok(())
 }
@@ -43,6 +49,22 @@ fn get_mediator_did() -> Result<String> {
         .unwrap();
 
     Ok(mediator_did)
+}
+
+/// Select the DID method to use for generating keys
+fn get_did_method() -> Result<DIDMethods> {
+    let selected = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("DID Method to use for generating keys")
+        .default(1)
+        .items(&["did:key", "did:peer"])
+        .interact()
+        .unwrap();
+
+    if selected == 0 {
+        Ok(DIDMethods::Key)
+    } else {
+        Ok(DIDMethods::Peer)
+    }
 }
 
 /// Get the Ollama address from the user
@@ -88,7 +110,12 @@ fn get_ollama_address() -> Result<(String, u16)> {
 }
 
 /// Creates a list of Ollama models that you can select to enable
-pub async fn add_ollama_models(host: &str, port: u16, config: &mut Config) -> Result<()> {
+pub async fn add_ollama_models(
+    host: &str,
+    port: u16,
+    config: &mut Config,
+    did_method: &DIDMethods,
+) -> Result<()> {
     let ollama = Ollama::new(host.to_string(), port);
 
     println!();
@@ -121,6 +148,7 @@ pub async fn add_ollama_models(host: &str, port: u16, config: &mut Config) -> Re
                 port,
                 &config.mediator_did,
                 &multi_select[*s],
+                did_method,
             )?,
         );
     }

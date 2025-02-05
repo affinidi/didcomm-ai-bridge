@@ -2,57 +2,22 @@
  * Handles the conversion of the configuration into DIDComm profiles and starting to listen.
  */
 
-use affinidi_messaging_sdk::{
-    messages::{fetch::FetchOptions, FetchDeletePolicy},
-    profiles::Profile,
-    secrets::Secret,
-    ATM,
-};
+use affinidi_messaging_sdk::{profiles::Profile, secrets::Secret, ATM};
 use anyhow::Result;
 use base64::{prelude::BASE64_STANDARD_NO_PAD, Engine};
 use console::style;
 use keyring::Entry;
 
-use crate::{config::OllamaModel, Config};
-
-/// Starts DIDComm agents for each of the configured models
-pub async fn activate_agents(atm: &ATM, config: &Config) -> Result<()> {
-    for (model_name, model) in &config.models {
-        let profile = _create_profile(atm, model_name, model, &config.mediator_did).await?;
-
-        print!(
-            "{}",
-            style(format!("Activating DIDComm Profile {}", model_name)).green()
-        );
-        // Activate the profile, but live streaming is off
-        let profile = atm.profile_add(&profile, false).await?;
-
-        // Clear out the inbox queue in case old questions have been queued up
-        atm.fetch_messages(
-            &profile,
-            &FetchOptions {
-                delete_policy: FetchDeletePolicy::Optimistic,
-                ..Default::default()
-            },
-        )
-        .await?;
-
-        // Start live streaming
-        atm.profile_enable_websocket(&profile).await?;
-
-        println!(" {}", style(":: activated!").green());
-    }
-    Ok(())
-}
+use crate::config::OllamaModel;
 
 /// Create a DIDComm profile for the given model
-async fn _create_profile(
+pub async fn create_model_profile(
     atm: &ATM,
     model_name: &str,
     model: &OllamaModel,
     mediator_did: &str,
 ) -> Result<Profile> {
-    let secrets = _get_secrets(&model.did)?;
+    let secrets = get_secrets(&model.did)?;
     let profile = Profile::new(
         atm,
         Some(model_name.to_string()),
@@ -65,7 +30,7 @@ async fn _create_profile(
 }
 
 /// Retrieves secrets for a DID from the keyring
-fn _get_secrets(did: &str) -> Result<Vec<Secret>> {
+pub fn get_secrets(did: &str) -> Result<Vec<Secret>> {
     // Fetch the secret from keyring
     let entry = Entry::new("didcomm-ollama", did)?;
     let raw_secrets = match entry.get_secret() {

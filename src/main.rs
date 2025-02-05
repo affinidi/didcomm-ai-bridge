@@ -3,21 +3,21 @@
  *
  */
 
-use activate::activate_agents;
-use affinidi_messaging_sdk::{
-    config::Config as ATMConfig, transports::websockets::ws_handler::WsHandlerMode, ATM,
-};
+use affinidi_messaging_sdk::{config::Config as ATMConfig, profiles::Profile, ATM};
 use anyhow::Result;
-use chat_messages::handle_message;
 use clap::Parser;
-use config::Config;
 use console::style;
-use setup_wizard::{add_new_model, run_setup_wizard};
+use didcomm_ollama::{
+    activate::get_secrets,
+    agents::concierge::{Concierge, ConciergeMessage},
+    config::Config,
+    termination::{create_termination, Interrupted},
+};
+use setup_wizard::run_setup_wizard;
+use tokio::{sync::mpsc, try_join};
+use tracing::info;
 use tracing_subscriber::filter;
 
-mod activate;
-mod chat_messages;
-mod config;
 mod setup_wizard;
 
 /// DIDComm agent for your Ollama models
@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
         "config.json".to_string()
     };
 
-    let mut config = match Config::load(&config_file) {
+    let config = match Config::load(&config_file) {
         Ok(config) => config,
         Err(e) => {
             if e.to_string()
@@ -73,43 +73,43 @@ async fn main() -> Result<()> {
         }
     };
 
-    // Add a new model to the configuration
-    if args.add_model {
-        add_new_model(&mut config).await?;
-        config.save(&config_file)?;
-    }
-
-    if config.models.is_empty() {
-        println!("{}", style("No models configured. You may want to run the setup wizard, or add a model manually.").yellow());
-        return Ok(());
-    }
-
     let atm = ATM::new(
         ATMConfig::builder()
-            .with_ws_handler_mode(WsHandlerMode::DirectChannel)
+            //.with_ws_handler_mode(WsHandlerMode::DirectChannel)
             .build()
             .unwrap(),
     )
     .await?;
 
-    // Configuration is all set, Activate each model DIDComm agent
-    activate_agents(&atm, &config).await?;
+    let (to_concierge, from_main) = mpsc::unbounded_channel::<ConciergeMessage>();
+    let (terminator, mut interrupt_rx) = create_termination();
+    let (concierge, _) = Concierge::new(atm.clone(), config.mediator_did.clone(), from_main);
 
-    let mut incoming = if let Some(channel) = atm.get_inbound_channel() {
-        channel
-    } else {
-        return Err(anyhow::anyhow!("No inbound channel found"));
-    };
+    let concierge_profile = Profile::new(
+        &atm,
+        Some("Affinidi Concierge".into()),
+        config.concierge_did.to_string(),
+        Some(config.mediator_did.to_string()),
+        get_secrets(&config.concierge_did)?,
+    )
+    .await?;
+    let concierge_handle = concierge.run(concierge_profile, terminator, interrupt_rx.resubscribe());
 
-    loop {
-        match incoming.recv().await {
-            Ok((msg, _)) => {
-                handle_message(&config, &atm, &msg).await;
-            }
-            Err(e) => {
-                println!("ERROR: {:?}", e);
-                return Err(e.into());
-            }
-        }
+    for (_, model) in config.models {
+        to_concierge.send(ConciergeMessage::StartModel { model })?;
     }
+
+    try_join!(concierge_handle)?;
+
+    if let Ok(reason) = interrupt_rx.recv().await {
+        match reason {
+            Interrupted::UserInt => info!("exited per user request"),
+            Interrupted::OsSigInt => info!("exited because of an os sig int"),
+            Interrupted::SystemError => info!("exited because of a system error"),
+        }
+    } else {
+        println!("exited because of an unexpected error");
+    }
+
+    Ok(())
 }

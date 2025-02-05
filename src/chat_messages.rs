@@ -2,7 +2,6 @@
  * Processing of chat messages
  */
 
-use crate::{config::OllamaModel, Config};
 use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_sdk::{
     messages::known::MessageType, profiles::Profile,
@@ -16,6 +15,8 @@ use std::{str::FromStr, sync::Arc};
 use tokio::io::{stdout, AsyncWriteExt};
 use tokio_stream::StreamExt;
 
+use crate::config::OllamaModel;
+
 #[derive(Deserialize, Serialize)]
 struct ChatMessage {
     pub text: String,
@@ -23,57 +24,19 @@ struct ChatMessage {
 
 /// Processes a received message
 /// Doesn't return anything
-pub(crate) async fn handle_message(config: &Config, atm: &ATM, message: &Message) {
-    // Get the profile of the recipient
-    let profile = {
-        let lock = atm.get_profiles();
-        let lock = lock.read().await;
-        let Some(to_dids) = message.to.as_ref() else {
-            println!("{}", style("No 'to' field in message").red());
-            return;
-        };
-        let Some(to_did) = to_dids.first() else {
-            println!(
-                "{}",
-                style(format!(
-                    "To field exists, but there are no DID's present: {:?}",
-                    message.to
-                ))
-                .red()
-            );
-            return;
-        };
-        if let Some(profile) = lock.find_by_did(to_did) {
-            profile
-        } else {
-            println!(
-                "{}",
-                style(format!("No profile found for DID: {}", to_did)).red()
-            );
-            return;
-        }
-    };
-
+pub(crate) async fn handle_message(
+    atm: &ATM,
+    profile: &Arc<Profile>,
+    model: &OllamaModel,
+    message: &Message,
+) {
     let Some(from_did) = message.from.clone() else {
         println!("{}", style("No 'from' field in message").red());
         println!(
             "{}",
             style("How would one respond to an anonymous message?").red()
         );
-        let _ = atm.delete_message_background(&profile, &message.id).await;
-        return;
-    };
-
-    // Get the model associated with this DIDComm profile
-    let Some(model) = config.models.get(profile.inner.alias.as_str()) else {
-        println!(
-            "{}",
-            style(format!(
-                "No model found for profile: {:?}",
-                profile.inner.alias
-            ))
-            .red()
-        );
+        let _ = atm.delete_message_background(profile, &message.id).await;
         return;
     };
 
@@ -82,7 +45,7 @@ pub(crate) async fn handle_message(config: &Config, atm: &ATM, message: &Message
             "{}",
             style(format!("Unknown message type: {:?}", message)).red()
         );
-        let _ = atm.delete_message_background(&profile, &message.id).await;
+        let _ = atm.delete_message_background(profile, &message.id).await;
         return;
     };
 
@@ -120,7 +83,7 @@ pub(crate) async fn handle_message(config: &Config, atm: &ATM, message: &Message
                             ))
                             .green()
                         );
-                        let _ = handle_prompt(atm, &profile, &chat_message, model, &from_did).await;
+                        let _ = handle_prompt(atm, profile, &chat_message, model, &from_did).await;
                     }
                     Err(e) => {
                         println!(
@@ -142,7 +105,7 @@ pub(crate) async fn handle_message(config: &Config, atm: &ATM, message: &Message
             println!("Received message: {:?}", message);
         }
     }
-    let _ = atm.delete_message_background(&profile, &message.id).await;
+    let _ = atm.delete_message_background(profile, &message.id).await;
 }
 
 /// Handles a prompt message
@@ -170,6 +133,7 @@ async fn handle_prompt(
 
     let mut think_flag = true;
     let mut output = String::new();
+
     while let Some(Ok(res)) = stream.next().await {
         for ele in res {
             //stdout.write_all(ele.response.as_bytes()).await?;
@@ -178,7 +142,7 @@ async fn handle_prompt(
                     continue;
                 } else if ele.response == ".\n\n" {
                     output.push_str(&ele.response);
-                    let _ = _send_message(atm, profile, &output, from_did).await;
+                    let _ = send_message(atm, profile, &output, from_did).await;
                     output.clear();
 
                     continue;
@@ -193,13 +157,14 @@ async fn handle_prompt(
             stdout.flush().await?;
         }
     }
-    let _ = _send_message(atm, profile, &output, from_did).await;
+
+    let _ = send_message(atm, profile, &output, from_did).await;
     println!("{}", style("AI Responded...").cyan());
 
     Ok(())
 }
 
-async fn _send_message(
+pub async fn send_message(
     atm: &ATM,
     profile: &Arc<Profile>,
     text: &str,
@@ -224,8 +189,23 @@ async fn _send_message(
         )
         .await?;
 
-    let _ = atm
-        .send_message(profile, &packed.0, &id, false, false)
-        .await?;
+    if packed.1.messaging_service.is_none() {
+        let _ = atm
+            .forward_and_send_message(
+                profile,
+                &packed.0,
+                None,
+                profile.dids()?.1,
+                from_did,
+                None,
+                None,
+                false,
+            )
+            .await?;
+    } else {
+        let _ = atm
+            .send_message(profile, &packed.0, &id, false, false)
+            .await?;
+    }
     Ok(())
 }
