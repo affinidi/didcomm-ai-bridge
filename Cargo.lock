@@ -97,7 +97,9 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-didcomm"
-version = "0.9.7"
+version = "0.9.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8aebf7fa86d513bf50462c73b4f2b391c3ef58eba299c1d4d201da06c6fabab8"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "anyhow",
@@ -120,7 +122,9 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-sdk"
-version = "0.9.7"
+version = "0.9.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b3eafae8e14c3269b9dc316ffba9b8ba04a077e1ac2722af759fcfca9ff59d6"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -3576,7 +3580,9 @@ dependencies = [
 
 [[package]]
 name = "ollama-rs"
-version = "0.2.4"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "269d1ec6f5f1b7a7b7413ab7eacb65177462f086293b4039bc43ee8bbed53836"
 dependencies = [
  "async-stream",
  "log",

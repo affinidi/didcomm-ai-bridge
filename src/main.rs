@@ -117,15 +117,15 @@ async fn main() -> Result<()> {
 
     try_join!(concierge_handle)?;
 
-    if let Ok(reason) = interrupt_rx.recv().await {
+    match interrupt_rx.recv().await { Ok(reason) => {
         match reason {
             Interrupted::UserInt => info!("exited per user request"),
             Interrupted::OsSigInt => info!("exited because of an os sig int"),
             Interrupted::SystemError => info!("exited because of a system error"),
         }
-    } else {
+    } _ => {
         println!("exited because of an unexpected error");
-    }
+    }}
 
     Ok(())
 }

@@ -9,13 +9,17 @@ DIDComm-Ollama Bridge enables a secure and private messaging service that is rob
 
 ## Is this truly private?
 
-Yes.
+**Yes.**
 
 The messaging framework is based on DIDComm (insert link) which utilises decentralized identity architecture to provide end-to-end public key cryptography, envelope encryption techniques and freedom to use a number of different crypto algorithms. These are all open-standards so there is no vendor lockin.
 
 Affinidi cannot see your what you are asking or the answers from your AI agents. This is encrypted using your keys on both the AI agent side and client side.
 
 You can choose to run your own DIDComm Mediator/Relay service if want to have complete control over your very own private messaging network.
+
+## Rust Toolchain
+
+This project is being tested against the Rust `2024` edition. You will need to install [Rust Nightly](https://doc.rust-lang.org/book/appendix-07-nightly-rust.html) for this project to work.
 
 ## Support & Feedback
 
