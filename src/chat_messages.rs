@@ -89,7 +89,21 @@ where
                     "{}: Received Connection Setup Request: from({:#?})",
                     profile.inner.alias, message.from
                 );
-                let new_did = send_connection_response(atm, profile, message).await?;
+                let didcomm_agent = {
+                    let lock = model.lock().await;
+
+                    let did_agent = lock
+                        .get_model()
+                        .unwrap()
+                        .dids
+                        .iter()
+                        .find(|d| d.did == profile.inner.did)
+                        .unwrap();
+
+                    did_agent.clone()
+                };
+                let new_did =
+                    send_connection_response(atm, profile, message, &didcomm_agent).await?;
                 {
                     let mut lock = model.lock().await;
                     let Some(from_did) = &message.from else {
@@ -112,17 +126,7 @@ where
                         },
                     );
                 }
-                let _ = send_message(
-                    atm,
-                    profile,
-                    &format!(
-                        "First Message from a very intelligent {}",
-                        profile.inner.alias
-                    ),
-                    &new_did,
-                    model,
-                )
-                .await;
+                let _ = send_message(atm, profile, &didcomm_agent.greeting, &new_did, model).await;
             }
             "https://affinidi.com/atm/client-actions/chat-presence" => {
                 // Send a presence response back

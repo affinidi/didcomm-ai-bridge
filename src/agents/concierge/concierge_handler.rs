@@ -5,7 +5,7 @@
  */
 
 use crate::{
-    activate::create_model_profile,
+    activate::create_model_profiles,
     agents::{
         model::{ModelAction, ModelAgent},
         state_management::{ChannelState, ChatChannelState, SharedState, SharedStateRef},
@@ -100,6 +100,11 @@ impl Concierge {
         let (to_concierge_from_models, mut from_models_to_concierge) =
             mpsc::unbounded_channel::<ModelAction>();
 
+        let didcomm_agent = {
+            let lock = self.shared_state.concierge.lock().await;
+            lock.agent.clone()
+        };
+
         let concierge_state = self.shared_state.concierge.clone();
         let result = loop {
             select! {
@@ -123,15 +128,14 @@ impl Concierge {
                         model.clone()
                     };
                     info!("Starting Model: {:?}", model_name);
-                    let model_profile = create_model_profile(&self.atm, &model_name, &model, &self.mediator_did).await?;
-                    let model_profile = self.atm.profile_add(&model_profile, false).await?;
-                    info!("Model Profile Created: {:?}", model_profile.inner.did);
+                    let model_profiles = create_model_profiles(&self.atm, &model_name, &model, &self.mediator_did).await?;
+                    //let model_profile = self.atm.profile_add(&model_profile, false).await?;
                     // Channel to communicate with the model
                     let (to_model, from_concierge) = mpsc::unbounded_channel::<ModelAction>();
 
                     let model_agent = ModelAgent::new(self.atm.clone(), model.clone(), from_concierge, to_concierge_from_models.clone());
                     info!("Model Agent new: {}", &model_name);
-                    model_agent.start(model_profile).await?;
+                    model_agent.start(model_profiles).await?;
 
                     info!("After run(): {}", &model_name);
                     models.insert(model_name.clone(), Model {  tx_channel: to_model});
@@ -164,7 +168,7 @@ impl Concierge {
                                 "{}: Received Connection Setup Request: from({:#?})",
                                 profile.inner.alias, message.from
                             );
-                            let new_did = send_connection_response(&self.atm, &profile, &message).await?;
+                            let new_did = send_connection_response(&self.atm, &profile, &message, &didcomm_agent).await?;
                             {
                                 let mut lock = concierge_state.lock().await;
                                 let Some(from_did) = &message.from else {
@@ -190,10 +194,7 @@ impl Concierge {
                             let _ = send_message(
                                 &self.atm,
                                 &profile,
-                                &format!(
-                                    "First Message from a very intelligent {}",
-                                    profile.inner.alias
-                                ),
+                               &didcomm_agent.greeting,
                                 &new_did,
                                 &concierge_state,
                             )

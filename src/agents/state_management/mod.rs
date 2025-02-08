@@ -60,10 +60,20 @@ pub struct ChatChannelState {
 #[derive(Clone, Default, Deserialize, Serialize)]
 pub struct ConciergeState {
     /// Concierge Agent DID for DIDComm
-    pub concierge_did: String,
+    pub agent: DIDCommAgent,
 
     /// Remote Channels State
     pub channel_state: HashMap<String, ChatChannelState>,
+}
+
+/// DIDCommAgent represents an agent that can communicate using DIDComm
+/// A model may have many listening agents
+#[derive(Clone, Default, Serialize, Deserialize)]
+pub struct DIDCommAgent {
+    pub did: String,
+    pub name: String,
+    pub greeting: String,
+    pub image: String,
 }
 
 /// OllamaModel represents a model within the Ollama Service
@@ -75,8 +85,8 @@ pub struct OllamaModel {
     pub ollama_host: String,
     /// Port of the Ollama service for this model
     pub ollama_port: u16,
-    /// DID for sending messages to this model
-    pub did: String,
+    /// DIDs for sending messages to this model
+    pub dids: Vec<DIDCommAgent>,
     /// ChannelState for this model
     pub channel_state: HashMap<String, ChatChannelState>,
 }
@@ -93,7 +103,12 @@ impl OllamaModel {
             name: model_name.into(),
             ollama_host,
             ollama_port,
-            did: create_did(did_method, mediator_did)?,
+            dids: vec![DIDCommAgent {
+                did: create_did(did_method, mediator_did)?,
+                greeting: "Standard Greeting".into(),
+                image: "deepseek.png".into(),
+                name: model_name.into(),
+            }],
             channel_state: HashMap::new(),
         })
     }
@@ -153,8 +168,11 @@ impl SharedState {
     pub async fn remove_model(&mut self, model_name: &str) {
         if let Some(model) = self.models.lock().await.remove(model_name) {
             // Clean up secret keys
-            let event = Entry::new("didcomm-ollama", &model.blocking_lock().did).unwrap();
-            let _ = event.delete_credential();
+            let lock = model.lock().await;
+            for did in &lock.dids {
+                let event = Entry::new("didcomm-ollama", &did.did).unwrap();
+                let _ = event.delete_credential();
+            }
         }
     }
 }

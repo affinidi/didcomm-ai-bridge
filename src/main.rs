@@ -90,7 +90,7 @@ async fn main() -> Result<()> {
     let (concierge, _) = Concierge::new(atm.clone(), config.clone(), from_main);
 
     let concierge_profile = {
-        let concierge_did = config.concierge.lock().await.concierge_did.clone();
+        let concierge_did = config.concierge.lock().await.agent.did.clone();
 
         Profile::new(
             &atm,

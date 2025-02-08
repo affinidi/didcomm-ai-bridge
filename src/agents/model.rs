@@ -4,7 +4,7 @@
  * Allows for interaction with a AI model via DIDComm messages
  */
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     agents::state_management::ChatChannelState,
@@ -63,7 +63,7 @@ impl ModelAgent {
         }
     }
 
-    pub async fn start(self, profile: Arc<Profile>) -> Result<JoinHandle<()>> {
+    pub async fn start(self, profiles: Vec<Profile>) -> Result<JoinHandle<()>> {
         let agent = ModelAgent {
             atm: self.atm.clone(),
             concierge_tx: self.concierge_tx.clone(),
@@ -72,27 +72,39 @@ impl ModelAgent {
         };
 
         let handle = tokio::spawn(async move {
-            let _ = agent.run(profile).await;
+            let _ = agent.run(profiles).await;
         });
 
         Ok(handle)
     }
 
     /// Run the Model Agent
-    async fn run(mut self, profile: Arc<Profile>) -> Result<Interrupted> {
+    async fn run(mut self, profiles: Vec<Profile>) -> Result<Interrupted> {
         let model_name = { self.model.lock().await.name.clone() };
-
-        info!("Model ({}) starting...", model_name);
-        let _ = clear_inbound_messages(&self.atm, &profile).await;
-        let _ = clear_outbound_messages(&self.atm, &profile).await;
-
-        // Start live streaming
-        self.atm.profile_enable_websocket(&profile).await?;
-
-        info!("Model ({}) Started", model_name);
         let (direct_tx, mut direct_rx) = mpsc::channel::<Box<(Message, UnpackMetadata)>>(32);
 
-        profile.enable_direct_channel(direct_tx).await?;
+        info!("Model ({}) starting...", model_name);
+        let mut activated_profiles: HashMap<String, Arc<Profile>> = HashMap::new();
+        for profile in profiles {
+            let model_profile = self.atm.profile_add(&profile, false).await?;
+            activated_profiles.insert(profile.inner.did.clone(), model_profile.clone());
+
+            let _ = clear_inbound_messages(&self.atm, &model_profile).await;
+            let _ = clear_outbound_messages(&self.atm, &model_profile).await;
+
+            // Start live streaming
+            self.atm.profile_enable_websocket(&model_profile).await?;
+            model_profile
+                .enable_direct_channel(direct_tx.clone())
+                .await?;
+            info!(
+                "Model ({}) Profile Activated: {}",
+                model_name, profile.inner.did
+            );
+        }
+
+        info!("Model ({}) Started", model_name);
+
         let result = loop {
             select! {
                 Some(action) = self.to_model_channel.recv() => match action {
@@ -124,8 +136,17 @@ impl ModelAgent {
                             model.name.clone()
                         };
 
-                       let _ = handle_message(&self.atm,  &profile, &self.model, &model_name, &message).await;
-                       let _ = self.atm.delete_message_background(&profile, &meta.sha256_hash).await;
+                        let to_did = message.to.as_ref().unwrap().first().unwrap().clone();
+                        let profile = match activated_profiles.get(&to_did) {
+                            Some(profile) => profile,
+                            None => {
+                                warn!("Received message from unknown DID: ({}). Ignoring...", to_did);
+                                continue;
+                            }
+                        };
+
+                       let _ = handle_message(&self.atm,  profile, &self.model, &model_name, &message).await;
+                       let _ = self.atm.delete_message_background(profile, &meta.sha256_hash).await;
                 },
             }
         };

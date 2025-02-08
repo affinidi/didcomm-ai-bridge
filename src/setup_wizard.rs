@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Input, MultiSelect, Select};
 use didcomm_ollama::{
-    agents::state_management::{ConciergeState, OllamaModel, SharedState},
+    agents::state_management::{ConciergeState, DIDCommAgent, OllamaModel, SharedState},
     create_did, DIDMethods,
 };
 use ollama_rs::Ollama;
@@ -17,7 +17,14 @@ pub(crate) async fn run_setup_wizard() -> Result<SharedState> {
     let did_method = get_did_method()?;
     let mut shared_state = SharedState {
         concierge: Arc::new(Mutex::new(ConciergeState {
-            concierge_did: create_did(&did_method, &mediator_did)?,
+            agent: DIDCommAgent {
+                did: create_did(&did_method, &mediator_did)?,
+                image: "ollmama.png".to_string(),
+                name: "AI Concierge".to_string(),
+                greeting:
+                    "I can help you manage your AI environment? Type /help for more information."
+                        .to_string(),
+            },
             ..Default::default()
         })),
         mediator_did,

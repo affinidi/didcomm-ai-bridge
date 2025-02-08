@@ -14,23 +14,28 @@ use tokio::sync::Mutex;
 use crate::agents::state_management::OllamaModel;
 
 /// Create a DIDComm profile for the given model
-pub async fn create_model_profile(
+pub async fn create_model_profiles(
     atm: &ATM,
     model_name: &str,
     model: &Arc<Mutex<OllamaModel>>,
     mediator_did: &str,
-) -> Result<Profile> {
+) -> Result<Vec<Profile>> {
     let model = model.lock().await;
-    let secrets = get_secrets(&model.did)?;
-    let profile = Profile::new(
-        atm,
-        Some(model_name.to_string()),
-        model.did.clone(),
-        Some(mediator_did.to_string()),
-        secrets,
-    )
-    .await?;
-    Ok(profile)
+    let mut profiles = Vec::new();
+    for did in &model.dids {
+        let secrets = get_secrets(&did.did)?;
+        profiles.push(
+            Profile::new(
+                atm,
+                Some(model_name.to_string()),
+                did.did.clone(),
+                Some(mediator_did.to_string()),
+                secrets,
+            )
+            .await?,
+        );
+    }
+    Ok(profiles)
 }
 
 /// Retrieves secrets for a DID from the keyring

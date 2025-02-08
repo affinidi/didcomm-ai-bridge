@@ -44,8 +44,6 @@ fn _create_did_key() -> Result<String> {
         });
     }
 
-    println!("secrets: {:#?}", secrets);
-
     let entry = Entry::new("didcomm-ollama", &did_key)?;
     entry.set_secret(
         BASE64_STANDARD_NO_PAD

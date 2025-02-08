@@ -13,6 +13,8 @@ use serde_json::json;
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use crate::agents::state_management::DIDCommAgent;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Name {
     pub given: Option<String>,
@@ -38,6 +40,8 @@ pub struct VCard {
     pub tel: Option<VcardType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub photo: Option<String>,
+    #[serde(rename = "x-meetingplace-contact-attributes")]
+    pub x_meetingplace_contact_attributes: String,
 }
 
 // Reads a file and returns a BAS64 encoded String
@@ -50,6 +54,7 @@ pub async fn send_connection_response(
     atm: &ATM,
     profile: &Arc<Profile>,
     message: &Message,
+    didcomm_agent: &DIDCommAgent,
 ) -> Result<String> {
     // Get the new DID
     let new_did = message
@@ -60,15 +65,11 @@ pub async fn send_connection_response(
         .unwrap()
         .to_string();
 
-    let photo = if profile.inner.alias.starts_with("deepseek") {
-        _read_file("deepseek.png")
-    } else {
-        _read_file("ollama.png")
-    };
+    let photo = _read_file(&didcomm_agent.image);
 
     let vcard = VCard {
         n: Name {
-            given: Some(profile.inner.alias.clone()),
+            given: Some(didcomm_agent.name.clone()),
             surname: Some(String::new()),
         },
         email: Some(VcardType {
@@ -78,6 +79,7 @@ pub async fn send_connection_response(
             r#type: VcardTypes::Cell(String::new()),
         }),
         photo: Some(photo),
+        x_meetingplace_contact_attributes: "8".to_string(),
     };
     let vcard = serde_json::to_string(&vcard).unwrap();
     let attachment = Attachment::base64(BASE64_URL_SAFE_NO_PAD.encode(vcard))

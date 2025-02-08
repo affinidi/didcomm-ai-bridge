@@ -30,8 +30,8 @@ pub async fn clear_inbound_messages(atm: &ATM, profile: &Arc<Profile>) -> Result
     }
 
     info!(
-        "{}: Cleared ({}) messages from INBOX",
-        profile.inner.alias, deleted
+        "{}: {}: Cleared ({}) messages from INBOX",
+        profile.inner.did, profile.inner.alias, deleted
     );
 
     Ok(())
@@ -56,8 +56,8 @@ pub async fn clear_outbound_messages(atm: &ATM, profile: &Arc<Profile>) -> Resul
     }
 
     info!(
-        "{}: Cleared ({}) messages from OUTBOX",
-        profile.inner.alias, deleted
+        "{}: {}: Cleared ({}) messages from OUTBOX",
+        profile.inner.did, profile.inner.alias, deleted
     );
 
     Ok(())
