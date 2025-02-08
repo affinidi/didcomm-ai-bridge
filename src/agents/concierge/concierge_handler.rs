@@ -201,11 +201,13 @@ impl Concierge {
                             .await;
                         } else if message.type_ ==  "https://affinidi.com/atm/client-actions/chat-presence" {
                             // Send a presence response back
-                            handle_presence(&self.atm, &profile, &message).await;
+                            handle_presence(&self.atm, &profile, &from_did).await;
                         } else if message.type_ ==  "https://affinidi.com/atm/client-actions/chat-delivered" {
                             // Ignore chat delivered messages
                         } else if message.type_ ==  "https://affinidi.com/atm/client-actions/chat-activity" {
                             // Ignore chat activity messages
+                        } else if message.type_ ==  "https://didcomm.org/messagepickup/3.0/status" {
+                            // Ignore DIDComm status messages
                         } else {
                             info!("Concierge Received Message: {:#?}", message);
                             let _ = send_message(
@@ -231,7 +233,8 @@ impl Concierge {
             info!("Send exit action to model: {}", model_name);
         }
 
-        //join_all(handles).await;
+        // Save the config to disk
+        self.shared_state.save("config.json").await?;
 
         Ok(result)
     }

@@ -61,6 +61,15 @@ where
         return Err(anyhow::anyhow!("Unknown message type"));
     };
 
+    let Some(from_did) = message.from.clone() else {
+        println!("{}", style("No 'from' field in message").red());
+        println!(
+            "{}",
+            style("How would one respond to an anonymous message?").red()
+        );
+        return Err(anyhow::anyhow!("No 'from' field in message"));
+    };
+
     match msg_type {
         MessageType::MessagePickupStatusResponse => {
             match serde_json::from_value::<MessagePickupStatusReply>(message.body.clone()) {
@@ -86,8 +95,8 @@ where
         MessageType::Other(_type) => match _type.as_str() {
             "https://affinidi.com/atm/client-actions/connection-setup" => {
                 info!(
-                    "{}: Received Connection Setup Request: from({:#?})",
-                    profile.inner.alias, message.from
+                    "{}: Received Connection Setup Request: from({})",
+                    profile.inner.alias, from_did
                 );
                 let didcomm_agent = {
                     let lock = model.lock().await;
@@ -106,14 +115,6 @@ where
                     send_connection_response(atm, profile, message, &didcomm_agent).await?;
                 {
                     let mut lock = model.lock().await;
-                    let Some(from_did) = &message.from else {
-                        println!("{}", style("No 'from' field in message").red());
-                        println!(
-                            "{}",
-                            style("How would one respond to an anonymous message?").red()
-                        );
-                        return Err(anyhow::anyhow!("No 'from' field in message"));
-                    };
                     let from_did_hash = digest(from_did);
                     lock.remove_channel_state(&from_did_hash);
                     let new_did_hash = digest(&new_did);
@@ -130,7 +131,7 @@ where
             }
             "https://affinidi.com/atm/client-actions/chat-presence" => {
                 // Send a presence response back
-                handle_presence(atm, profile, message).await;
+                handle_presence(atm, profile, &from_did).await;
             }
             "https://affinidi.com/atm/client-actions/chat-effect" => {
                 // Special handling for balloons and confetti
@@ -149,23 +150,11 @@ where
                             .green()
                         );
                         if chat_message.text.starts_with("/") {
-                            let _ = handle_command(
-                                atm,
-                                profile,
-                                &chat_message,
-                                model,
-                                message.from.as_ref().unwrap(),
-                            )
-                            .await;
+                            let _ =
+                                handle_command(atm, profile, &chat_message, model, &from_did).await;
                         } else {
-                            let _ = handle_prompt(
-                                atm,
-                                profile,
-                                &chat_message,
-                                model,
-                                message.from.as_ref().unwrap(),
-                            )
-                            .await;
+                            let _ =
+                                handle_prompt(atm, profile, &chat_message, model, &from_did).await;
                         }
                     }
                     Err(e) => {
@@ -335,6 +324,7 @@ where
             }
             _ = typing_interval.tick() => {
                 let _ = i_am_thinking(atm, profile, model, to_did).await;
+                let _ = handle_presence(atm, profile, to_did).await;
             }
             token = stream.next() => {
                 match token {
