@@ -7,18 +7,26 @@
 use std::sync::Arc;
 
 use crate::{
-    chat_messages::handle_message, config::OllamaModel,
-    didcomm_messages::clear_messages::clear_inbound_messages, termination::Interrupted,
+    agents::state_management::ChatChannelState,
+    chat_messages::handle_message,
+    didcomm_messages::clear_messages::{clear_inbound_messages, clear_outbound_messages},
+    termination::Interrupted,
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
 use affinidi_messaging_sdk::{profiles::Profile, ATM};
 use anyhow::Result;
+use sha256::digest;
 use tokio::{
     select,
-    sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
+    sync::{
+        mpsc::{self, UnboundedReceiver, UnboundedSender},
+        Mutex,
+    },
     task::JoinHandle,
 };
-use tracing::info;
+use tracing::{info, warn};
+
+use super::state_management::OllamaModel;
 
 /// Model Actions that can be sent to/from Model Task
 #[derive(Debug)]
@@ -35,7 +43,7 @@ pub struct ModelAgent {
     /// Channel that this model uses to receive messages from the concierge
     to_model_channel: UnboundedReceiver<ModelAction>,
     /// Model info
-    model: OllamaModel,
+    model: Arc<Mutex<OllamaModel>>,
 }
 
 impl ModelAgent {
@@ -43,7 +51,7 @@ impl ModelAgent {
     /// Returns Model Agent
     pub fn new(
         atm: ATM,
-        model: OllamaModel,
+        model: Arc<Mutex<OllamaModel>>,
         to_model_channel: UnboundedReceiver<ModelAction>,
         to_concierge_channel: UnboundedSender<ModelAction>,
     ) -> Self {
@@ -72,17 +80,19 @@ impl ModelAgent {
 
     /// Run the Model Agent
     async fn run(mut self, profile: Arc<Profile>) -> Result<Interrupted> {
-        info!("Model ({}) starting...", self.model.name);
+        let model_name = { self.model.lock().await.name.clone() };
+
+        info!("Model ({}) starting...", model_name);
         let _ = clear_inbound_messages(&self.atm, &profile).await;
+        let _ = clear_outbound_messages(&self.atm, &profile).await;
 
         // Start live streaming
         self.atm.profile_enable_websocket(&profile).await?;
 
-        info!("Model ({}) Started", self.model.name);
+        info!("Model ({}) Started", model_name);
         let (direct_tx, mut direct_rx) = mpsc::channel::<Box<(Message, UnpackMetadata)>>(32);
 
         profile.enable_direct_channel(direct_tx).await?;
-
         let result = loop {
             select! {
                 Some(action) = self.to_model_channel.recv() => match action {
@@ -95,13 +105,32 @@ impl ModelAgent {
                 Some(boxed_data) = direct_rx.recv() => {
                         let (message, meta) = *boxed_data;
 
-                       let _ = handle_message(&self.atm, &profile, &self.model, &message).await;
+                        let Some(from_did) = message.from.clone() else {
+                            warn!("Received anonymous message, can't reply. Ignoring...");
+                            continue;
+                        };
+                        let from_did_hash = digest(&from_did);
+
+                        let model_name = {
+                            let mut model = self.model.lock().await;
+                            if model.channel_state.get_mut(&from_did_hash).is_none() {
+                                    let remote_state = ChatChannelState {
+                                        remote_did_hash: from_did_hash.clone(),
+                                        remote_did: from_did.clone(),
+                                        ..Default::default()
+                                    };
+                                    model.channel_state.insert(from_did_hash.clone(), remote_state);
+                            }
+                            model.name.clone()
+                        };
+
+                       let _ = handle_message(&self.atm,  &profile, &self.model, &model_name, &message).await;
                        let _ = self.atm.delete_message_background(&profile, &meta.sha256_hash).await;
                 },
             }
         };
 
-        info!("{}: Exiting Model Agent", self.model.name);
+        info!("{}: Exiting Model Agent", model_name);
 
         Ok(result)
     }

@@ -3,14 +3,18 @@
  *
  */
 
+use std::sync::Arc;
+
 use affinidi_messaging_sdk::{config::Config as ATMConfig, profiles::Profile, ATM};
 use anyhow::Result;
 use clap::Parser;
 use console::style;
 use didcomm_ollama::{
     activate::get_secrets,
-    agents::concierge::{Concierge, ConciergeMessage},
-    config::Config,
+    agents::{
+        concierge::concierge_handler::{Concierge, ConciergeMessage},
+        state_management::SharedState,
+    },
     termination::{create_termination, Interrupted},
 };
 use setup_wizard::run_setup_wizard;
@@ -55,16 +59,16 @@ async fn main() -> Result<()> {
         "config.json".to_string()
     };
 
-    let config = match Config::load(&config_file) {
-        Ok(config) => config,
+    let config = match SharedState::load(&config_file) {
+        Ok(config) => Arc::new(config),
         Err(e) => {
             if e.to_string()
                 .starts_with("Couldn't open configuration file")
             {
                 println!("{}", style("ERROR: No configuration file found.").red());
                 let config = run_setup_wizard().await?;
-                config.save(&config_file)?;
-                config
+                config.save(&config_file).await?;
+                Arc::new(config)
             } else {
                 let root_cause = e.root_cause();
                 println!("{}", style(format!("ERROR: {}: {}", e, root_cause)).red());
@@ -83,20 +87,32 @@ async fn main() -> Result<()> {
 
     let (to_concierge, from_main) = mpsc::unbounded_channel::<ConciergeMessage>();
     let (terminator, mut interrupt_rx) = create_termination();
-    let (concierge, _) = Concierge::new(atm.clone(), config.mediator_did.clone(), from_main);
+    let (concierge, _) = Concierge::new(atm.clone(), config.clone(), from_main);
 
-    let concierge_profile = Profile::new(
-        &atm,
-        Some("Affinidi Concierge".into()),
-        config.concierge_did.to_string(),
-        Some(config.mediator_did.to_string()),
-        get_secrets(&config.concierge_did)?,
-    )
-    .await?;
+    let concierge_profile = {
+        let concierge_did = config.concierge.lock().await.concierge_did.clone();
+
+        Profile::new(
+            &atm,
+            Some("Affinidi Concierge".into()),
+            concierge_did.to_string(),
+            Some(config.mediator_did.to_string()),
+            get_secrets(&concierge_did)?,
+        )
+        .await?
+    };
     let concierge_handle = concierge.run(concierge_profile, terminator, interrupt_rx.resubscribe());
 
-    for (_, model) in config.models {
-        to_concierge.send(ConciergeMessage::StartModel { model })?;
+    let mut model_names = Vec::new();
+    {
+        let models = &config.models.lock().await;
+        for (model_name, _) in models.iter() {
+            model_names.push(model_name.to_string());
+        }
+    }
+
+    for model_name in model_names {
+        to_concierge.send(ConciergeMessage::StartModel { model_name })?;
     }
 
     try_join!(concierge_handle)?;

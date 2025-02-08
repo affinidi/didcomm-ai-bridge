@@ -11,6 +11,7 @@ use anyhow::Result;
 use console::style;
 use ollama_rs::{generation::completion::request::GenerationRequest, Ollama};
 use serde::{Deserialize, Serialize};
+use sha256::digest;
 use std::{
     str::FromStr,
     sync::Arc,
@@ -19,13 +20,14 @@ use std::{
 use tokio::{
     io::{stdout, AsyncWriteExt},
     select,
+    sync::Mutex,
     time::Instant,
 };
 use tokio_stream::StreamExt;
 use tracing::{error, info, warn};
 
 use crate::{
-    config::OllamaModel,
+    agents::state_management::{ChannelState, ChatChannelState},
     didcomm_messages::{handle_presence, oob_connection::send_connection_response},
 };
 
@@ -41,21 +43,16 @@ struct ChatEffect {
 
 /// Processes a received message
 /// Doesn't return anything
-pub(crate) async fn handle_message(
+pub(crate) async fn handle_message<T>(
     atm: &ATM,
     profile: &Arc<Profile>,
-    model: &OllamaModel,
+    model: &Arc<Mutex<T>>,
+    model_name: &str,
     message: &Message,
-) -> Result<()> {
-    let Some(from_did) = message.from.clone() else {
-        println!("{}", style("No 'from' field in message").red());
-        println!(
-            "{}",
-            style("How would one respond to an anonymous message?").red()
-        );
-        return Err(anyhow::anyhow!("No 'from' field in message"));
-    };
-
+) -> Result<()>
+where
+    T: ChannelState,
+{
     let Ok(msg_type) = MessageType::from_str(&message.type_) else {
         println!(
             "{}",
@@ -93,6 +90,28 @@ pub(crate) async fn handle_message(
                     profile.inner.alias, message.from
                 );
                 let new_did = send_connection_response(atm, profile, message).await?;
+                {
+                    let mut lock = model.lock().await;
+                    let Some(from_did) = &message.from else {
+                        println!("{}", style("No 'from' field in message").red());
+                        println!(
+                            "{}",
+                            style("How would one respond to an anonymous message?").red()
+                        );
+                        return Err(anyhow::anyhow!("No 'from' field in message"));
+                    };
+                    let from_did_hash = digest(from_did);
+                    lock.remove_channel_state(&from_did_hash);
+                    let new_did_hash = digest(&new_did);
+                    lock.insert_channel_state(
+                        &new_did_hash,
+                        ChatChannelState {
+                            remote_did: new_did.clone(),
+                            remote_did_hash: new_did_hash.clone(),
+                            ..Default::default()
+                        },
+                    );
+                }
                 let _ = send_message(
                     atm,
                     profile,
@@ -101,6 +120,7 @@ pub(crate) async fn handle_message(
                         profile.inner.alias
                     ),
                     &new_did,
+                    model,
                 )
                 .await;
             }
@@ -120,11 +140,29 @@ pub(crate) async fn handle_message(
                             "{}",
                             style(format!(
                                 "Model ({}): incoming prompt: {:?}",
-                                model.name, chat_message.text
+                                model_name, chat_message.text
                             ))
                             .green()
                         );
-                        let _ = handle_prompt(atm, profile, &chat_message, model, &from_did).await;
+                        if chat_message.text.starts_with("/") {
+                            let _ = handle_command(
+                                atm,
+                                profile,
+                                &chat_message,
+                                model,
+                                message.from.as_ref().unwrap(),
+                            )
+                            .await;
+                        } else {
+                            let _ = handle_prompt(
+                                atm,
+                                profile,
+                                &chat_message,
+                                model,
+                                message.from.as_ref().unwrap(),
+                            )
+                            .await;
+                        }
                     }
                     Err(e) => {
                         println!(
@@ -156,28 +194,21 @@ pub(crate) async fn handle_message(
     Ok(())
 }
 
-pub(crate) async fn handle_chat_effect(
+pub(crate) async fn handle_chat_effect<T>(
     atm: &ATM,
     profile: &Arc<Profile>,
-    model: &OllamaModel,
+    model: &Arc<Mutex<T>>,
     message: &Message,
-) {
-    let Some(from_did) = message.from.clone() else {
-        println!("{}", style("No 'from' field in message").red());
-        println!(
-            "{}",
-            style("How would one respond to an anonymous message?").red()
-        );
-        return;
-    };
-
+) where
+    T: ChannelState,
+{
     match serde_json::from_value::<ChatEffect>(message.body.clone()) {
         Ok(chat_effect) => {
             println!(
                 "{}",
                 style(format!(
                     "Model ({}): incoming effect: {:?}",
-                    model.name, chat_effect.effect
+                    profile.inner.alias, chat_effect.effect
                 ))
                 .green()
             );
@@ -193,7 +224,7 @@ pub(crate) async fn handle_chat_effect(
                 profile,
                 &ChatMessage { text: prompt },
                 model,
-                &from_did,
+                message.from.as_ref().unwrap(),
             )
             .await;
         }
@@ -206,20 +237,71 @@ pub(crate) async fn handle_chat_effect(
     }
 }
 
-/// Handles a prompt message
-async fn handle_prompt(
+/// Handles a command message
+async fn handle_command<T>(
     atm: &ATM,
     profile: &Arc<Profile>,
     chat_message: &ChatMessage,
-    model: &OllamaModel,
-    from_did: &str,
-) -> Result<()> {
+    model: &Arc<Mutex<T>>,
+    remote_did: &str,
+) -> Result<()>
+where
+    T: ChannelState,
+{
+    let response = if chat_message.text.to_lowercase() == "/help" {
+        r#"Help:
+          /help - Display this help message
+          /think - Status of the think tokens being displayed
+          /think on|off - Turn think tokens on or off
+          /dids - Display the DID's for this chat
+        "#
+        .to_string()
+    } else if chat_message.text.to_lowercase() == "/dids" {
+        format!(
+            "DIDs:\nAgent: {}\nClient: {}",
+            profile.inner.did, remote_did
+        )
+    } else {
+        format!(
+            "ERROR: unknown command: {}\nUse /help to show commands",
+            chat_message.text
+        )
+    };
+
+    let _ = send_message(atm, profile, &response, remote_did, model).await;
+
+    Ok(())
+}
+
+/// Handles a prompt message
+async fn handle_prompt<T>(
+    atm: &ATM,
+    profile: &Arc<Profile>,
+    chat_message: &ChatMessage,
+    model: &Arc<Mutex<T>>,
+    to_did: &str,
+) -> Result<()>
+where
+    T: ChannelState,
+{
+    let (ollama_host, ollama_port, model_name) = {
+        let lock = model.lock().await;
+
+        let model = lock.get_model().unwrap();
+
+        (
+            model.ollama_host.clone(),
+            model.ollama_port,
+            model.name.clone(),
+        )
+    };
+
     // Instantiate Ollama
-    let ollama = Ollama::new(&model.ollama_host, model.ollama_port);
+    let ollama = Ollama::new(&ollama_host, ollama_port);
 
     let mut stream = ollama
         .generate_stream(GenerationRequest::new(
-            model.name.clone(),
+            model_name.clone(),
             chat_message.text.clone(),
         ))
         .await
@@ -239,16 +321,16 @@ async fn handle_prompt(
     );
     tokio::pin!(timeout);
 
-    let _ = i_am_thinking(atm, profile, from_did).await;
+    let _ = i_am_thinking(atm, profile, model, to_did).await;
     loop {
         select! {
             _ = &mut timeout => {
                 warn!("AI Response timed out");
-                let _ = send_message(atm, profile, "Timeout: I'm sorry, I'm taking too long to respond", from_did).await;
+                let _ = send_message(atm, profile, "Timeout: I'm sorry, I'm taking too long to respond", to_did, model).await;
                 break;
             }
             _ = typing_interval.tick() => {
-                let _ = i_am_thinking(atm, profile, from_did).await;
+                let _ = i_am_thinking(atm, profile, model, to_did).await;
             }
             token = stream.next() => {
                 match token {
@@ -260,7 +342,7 @@ async fn handle_prompt(
                                     continue;
                                 } else if ele.response == ".\n\n" {
                                     output.push_str(&ele.response);
-                                    let _ = send_message(atm, profile, &output, from_did).await;
+                                    let _ = send_message(atm, profile, &output, to_did, model).await;
                                     output.clear();
 
                                     continue;
@@ -287,23 +369,37 @@ async fn handle_prompt(
         }
     }
 
-    let _ = send_message(atm, profile, &output, from_did).await;
+    let _ = send_message(atm, profile, &output, to_did, model).await;
     println!("{}", style("AI Responded...").cyan());
 
     Ok(())
 }
 
-pub async fn send_message(
+pub async fn send_message<T>(
     atm: &ATM,
     profile: &Arc<Profile>,
     text: &str,
-    from_did: &str,
-) -> Result<()> {
+    to_did: &str,
+    channel_state: &Arc<Mutex<T>>,
+) -> Result<()>
+where
+    T: ChannelState,
+{
+    let seq_no = {
+        let mut channel_state = channel_state.lock().await;
+        let state = channel_state
+            .get_channel_state_mut(&digest(to_did))
+            .unwrap();
+        let seq_no = state.seq_no;
+        state.seq_no += 1;
+
+        seq_no
+    };
     let id = uuid::Uuid::new_v4().to_string();
     let msg = Message::build(
         id.clone(),
         "https://affinidi.com/atm/client-actions/chat-message".to_string(),
-        serde_json::json!({ "text": text }),
+        serde_json::json!({ "text": text, "seqNo": seq_no }),
     )
     .created_time(
         SystemTime::now()
@@ -312,13 +408,13 @@ pub async fn send_message(
             .as_secs(),
     )
     .from(profile.inner.did.clone())
-    .to(from_did.to_string())
+    .to(to_did.to_string())
     .finalize();
 
     let packed = atm
         .pack_encrypted(
             &msg,
-            from_did,
+            to_did,
             Some(&profile.inner.did),
             Some(&profile.inner.did),
         )
@@ -331,7 +427,7 @@ pub async fn send_message(
                 &packed.0,
                 None,
                 profile.dids()?.1,
-                from_did,
+                to_did,
                 None,
                 None,
                 false,
@@ -401,13 +497,30 @@ async fn ack_message(atm: &ATM, profile: &Arc<Profile>, message: &Message) -> Re
     Ok(())
 }
 
-async fn i_am_thinking(atm: &ATM, profile: &Arc<Profile>, from_did: &str) -> Result<()> {
-    // TODO: Implement state for the connection
+async fn i_am_thinking<T>(
+    atm: &ATM,
+    profile: &Arc<Profile>,
+    channel_state: &Arc<Mutex<T>>,
+    to_did: &str,
+) -> Result<()>
+where
+    T: ChannelState,
+{
+    let activity_seq_no = {
+        let mut channel_state = channel_state.lock().await;
+        let state = channel_state
+            .get_channel_state_mut(&digest(to_did))
+            .unwrap();
+        let activity_seq_no = state.activity_seq_no;
+        state.activity_seq_no += 1;
+
+        activity_seq_no
+    };
     let id = uuid::Uuid::new_v4().to_string();
     let new_msg = Message::build(
         id.clone(),
         "https://affinidi.com/atm/client-actions/chat-activity".to_string(),
-        serde_json::json!({ "activitySeqNo": 0 }),
+        serde_json::json!({ "activitySeqNo": activity_seq_no }),
     )
     .created_time(
         SystemTime::now()
@@ -416,7 +529,7 @@ async fn i_am_thinking(atm: &ATM, profile: &Arc<Profile>, from_did: &str) -> Res
             .as_secs(),
     )
     .from(profile.inner.did.clone())
-    .to(from_did.to_string())
+    .to(to_did.to_string())
     .finalize();
 
     println!("{}", style("Typing...").cyan());
@@ -424,7 +537,7 @@ async fn i_am_thinking(atm: &ATM, profile: &Arc<Profile>, from_did: &str) -> Res
     let packed = atm
         .pack_encrypted(
             &new_msg,
-            from_did,
+            to_did,
             Some(&profile.inner.did),
             Some(&profile.inner.did),
         )
@@ -437,7 +550,7 @@ async fn i_am_thinking(atm: &ATM, profile: &Arc<Profile>, from_did: &str) -> Res
                 &packed.0,
                 None,
                 profile.dids()?.1,
-                from_did,
+                to_did,
                 Some(
                     SystemTime::now()
                         .duration_since(SystemTime::UNIX_EPOCH)

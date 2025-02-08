@@ -11,7 +11,6 @@ use ssi::{jwk::Params, JWK};
 pub mod activate;
 pub mod agents;
 pub mod chat_messages;
-pub mod config;
 pub mod didcomm_messages;
 pub mod termination;
 

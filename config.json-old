@@ -1,0 +1,12 @@
+{
+  "models": {
+    "deepseek-r1:7b": {
+      "name": "deepseek-r1:7b",
+      "ollama_host": "http://localhost",
+      "ollama_port": 11434,
+      "did": "did:key:zDnaecdUEwFYN4ihLF7guLsnUTbAHXZn4rFgR9hjgWnsDmsU9"
+    }
+  },
+  "mediator_did": "did:web:mediator-nlb.storm.ws:mediator:v1:.well-known",
+  "concierge_did": "did:key:zDnaeZjKAKCT54mW7N8ywPPu5FQvapZmW7ZdapZC8NJFxZkRW"
+}

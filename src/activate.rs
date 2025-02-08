@@ -2,21 +2,25 @@
  * Handles the conversion of the configuration into DIDComm profiles and starting to listen.
  */
 
+use std::sync::Arc;
+
 use affinidi_messaging_sdk::{profiles::Profile, secrets::Secret, ATM};
 use anyhow::Result;
 use base64::{prelude::BASE64_STANDARD_NO_PAD, Engine};
 use console::style;
 use keyring::Entry;
+use tokio::sync::Mutex;
 
-use crate::config::OllamaModel;
+use crate::agents::state_management::OllamaModel;
 
 /// Create a DIDComm profile for the given model
 pub async fn create_model_profile(
     atm: &ATM,
     model_name: &str,
-    model: &OllamaModel,
+    model: &Arc<Mutex<OllamaModel>>,
     mediator_did: &str,
 ) -> Result<Profile> {
+    let model = model.lock().await;
     let secrets = get_secrets(&model.did)?;
     let profile = Profile::new(
         atm,

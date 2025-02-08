@@ -4,15 +4,16 @@
  * Concierge allows for self management of the Ollama Bridge
  */
 
-use std::collections::HashMap;
-
 use crate::{
     activate::create_model_profile,
-    agents::model::{ModelAction, ModelAgent},
+    agents::{
+        model::{ModelAction, ModelAgent},
+        state_management::{ChannelState, ChatChannelState, SharedState, SharedStateRef},
+    },
     chat_messages::send_message,
-    config::OllamaModel,
     didcomm_messages::{
-        clear_messages::clear_inbound_messages, handle_presence,
+        clear_messages::{clear_inbound_messages, clear_outbound_messages},
+        handle_presence,
         oob_connection::send_connection_response,
     },
     termination::{Interrupted, Terminator},
@@ -20,6 +21,9 @@ use crate::{
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
 use affinidi_messaging_sdk::{profiles::Profile, ATM};
 use anyhow::Result;
+use console::style;
+use sha256::digest;
+use std::{collections::HashMap, sync::Arc};
 use tokio::{
     select,
     sync::{
@@ -32,7 +36,7 @@ use tracing::{info, warn};
 /// Concierge Messages that can be sent to/from Concierge Task
 pub enum ConciergeMessage {
     Exit,
-    StartModel { model: OllamaModel },
+    StartModel { model_name: String },
 }
 
 /// Concierge Task
@@ -43,6 +47,8 @@ pub struct Concierge {
     to_concierge_channel: UnboundedReceiver<ConciergeMessage>,
     /// Mediator DID
     mediator_did: String,
+    /// Shared State
+    shared_state: SharedStateRef,
 }
 
 struct Model {
@@ -55,15 +61,16 @@ impl Concierge {
     /// Returns a tuple with the Concierge Task and a Receiver for messages from the Concierge Task
     pub fn new(
         atm: ATM,
-        mediator_did: String,
+        config: Arc<SharedState>,
         to_concierge: UnboundedReceiver<ConciergeMessage>,
     ) -> (Self, UnboundedReceiver<ConciergeMessage>) {
         let (_, from_concierge) = mpsc::unbounded_channel::<ConciergeMessage>();
         (
             Self {
                 atm,
-                mediator_did,
+                mediator_did: config.mediator_did.clone(),
                 to_concierge_channel: to_concierge,
+                shared_state: config,
             },
             from_concierge,
         )
@@ -78,6 +85,7 @@ impl Concierge {
     ) -> Result<Interrupted> {
         let profile = self.atm.profile_add(&profile, false).await?;
         let _ = clear_inbound_messages(&self.atm, &profile).await;
+        let _ = clear_outbound_messages(&self.atm, &profile).await;
 
         // Start live streaming
         self.atm.profile_enable_websocket(&profile).await?;
@@ -92,6 +100,7 @@ impl Concierge {
         let (to_concierge_from_models, mut from_models_to_concierge) =
             mpsc::unbounded_channel::<ModelAction>();
 
+        let concierge_state = self.shared_state.concierge.clone();
         let result = loop {
             select! {
                 Some(action) = from_models_to_concierge.recv() => {
@@ -104,46 +113,106 @@ impl Concierge {
 
                     break Interrupted::UserInt;
                 },
-                ConciergeMessage::StartModel { model } => {
-                    info!("Starting Model: {:?}", model.name);
-                    let model_profile = create_model_profile(&self.atm, &model.name, &model, &self.mediator_did).await?;
+                ConciergeMessage::StartModel { model_name } => {
+                    let model = {
+                        let lock = self.shared_state.models.lock().await;
+                        let Some(model) = lock.get(&model_name) else {
+                            warn!("Model not found: {}", model_name);
+                            continue;
+                        };
+                        model.clone()
+                    };
+                    info!("Starting Model: {:?}", model_name);
+                    let model_profile = create_model_profile(&self.atm, &model_name, &model, &self.mediator_did).await?;
                     let model_profile = self.atm.profile_add(&model_profile, false).await?;
                     info!("Model Profile Created: {:?}", model_profile.inner.did);
                     // Channel to communicate with the model
                     let (to_model, from_concierge) = mpsc::unbounded_channel::<ModelAction>();
 
                     let model_agent = ModelAgent::new(self.atm.clone(), model.clone(), from_concierge, to_concierge_from_models.clone());
-                    info!("Model Agent new: {}", &model.name);
+                    info!("Model Agent new: {}", &model_name);
                     model_agent.start(model_profile).await?;
 
-                    info!("After run(): {}", &model.name);
-                    models.insert(model.name.clone(), Model {  tx_channel: to_model});
+                    info!("After run(): {}", &model_name);
+                    models.insert(model_name.clone(), Model {  tx_channel: to_model});
                 }
             },
                 Some(boxed_data) = direct_rx.recv() => {
                         let (message, meta) = *boxed_data;
                         let _ = self.atm.delete_message_background(&profile, &meta.sha256_hash).await;
 
+                        let Some(from_did) = message.from.clone() else {
+                            warn!("Received anonymous message, can't reply. Ignoring...");
+                            continue;
+                        };
+                        let from_did_hash = digest(&from_did);
+
+                        {
+                            let mut concierge_state = concierge_state.lock().await;
+                            if  concierge_state.get_channel_state(&from_did_hash).is_none() {
+                                let remote_state = ChatChannelState {
+                                    remote_did_hash: from_did_hash.clone(),
+                                    remote_did: from_did.clone(),
+                                    ..Default::default()
+                                };
+                                concierge_state.insert_channel_state(&from_did_hash, remote_state);
+                            }
+                        }
+
                         if message.type_ == "https://affinidi.com/atm/client-actions/connection-setup" {
-                            info!("Concierge Received Connection Setup Message: {:#?}", message);
+                            info!(
+                                "{}: Received Connection Setup Request: from({:#?})",
+                                profile.inner.alias, message.from
+                            );
                             let new_did = send_connection_response(&self.atm, &profile, &message).await?;
+                            {
+                                let mut lock = concierge_state.lock().await;
+                                let Some(from_did) = &message.from else {
+                                    println!("{}", style("No 'from' field in message").red());
+                                    println!(
+                                        "{}",
+                                        style("How would one respond to an anonymous message?").red()
+                                    );
+                                    return Err(anyhow::anyhow!("No 'from' field in message"));
+                                };
+                                let from_did_hash = digest(from_did);
+                                lock.remove_channel_state(&from_did_hash);
+                                let new_did_hash = digest(&new_did);
+                                lock.insert_channel_state(
+                                    &new_did_hash,
+                                    ChatChannelState {
+                                        remote_did: new_did.clone(),
+                                        remote_did_hash: new_did_hash.clone(),
+                                        ..Default::default()
+                                    },
+                                );
+                            }
                             let _ = send_message(
                                 &self.atm,
                                 &profile,
-                                "First Message from a very intelligent concierge",
+                                &format!(
+                                    "First Message from a very intelligent {}",
+                                    profile.inner.alias
+                                ),
                                 &new_did,
+                                &concierge_state,
                             )
                             .await;
                         } else if message.type_ ==  "https://affinidi.com/atm/client-actions/chat-presence" {
                             // Send a presence response back
                             handle_presence(&self.atm, &profile, &message).await;
+                        } else if message.type_ ==  "https://affinidi.com/atm/client-actions/chat-delivered" {
+                            // Ignore chat delivered messages
+                        } else if message.type_ ==  "https://affinidi.com/atm/client-actions/chat-activity" {
+                            // Ignore chat activity messages
                         } else {
                             info!("Concierge Received Message: {:#?}", message);
                             let _ = send_message(
                                 &self.atm,
                                 &profile,
                                 "I am an unintelligent response from a very intelligent concierge",
-                                &message.from.unwrap(),
+                                message.from.as_ref().unwrap(),
+                                &concierge_state,
                             )
                             .await;
                         }

@@ -2,31 +2,39 @@ use anyhow::{anyhow, Result};
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Input, MultiSelect, Select};
 use didcomm_ollama::{
-    config::{Config, OllamaModel},
+    agents::state_management::{ConciergeState, OllamaModel, SharedState},
     create_did, DIDMethods,
 };
 use ollama_rs::Ollama;
 use regex::Regex;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
-pub(crate) async fn run_setup_wizard() -> Result<Config> {
+pub(crate) async fn run_setup_wizard() -> Result<SharedState> {
     println!();
     println!("{}", style("Running setup wizard").green());
     let mediator_did = get_mediator_did()?;
     let did_method = get_did_method()?;
-    let mut config = Config {
-        concierge_did: create_did(&did_method, &mediator_did)?,
+    let mut shared_state = SharedState {
+        concierge: Arc::new(Mutex::new(ConciergeState {
+            concierge_did: create_did(&did_method, &mediator_did)?,
+            ..Default::default()
+        })),
         mediator_did,
         ..Default::default()
     };
 
-    add_new_model(&mut config, &did_method).await?;
+    add_new_model(&mut shared_state, &did_method).await?;
 
-    Ok(config)
+    Ok(shared_state)
 }
 
-pub(crate) async fn add_new_model(config: &mut Config, did_method: &DIDMethods) -> Result<()> {
+pub(crate) async fn add_new_model(
+    shared_state: &mut SharedState,
+    did_method: &DIDMethods,
+) -> Result<()> {
     let (address, port) = get_ollama_address()?;
-    add_ollama_models(&address, port, config, did_method).await?;
+    add_ollama_models(&address, port, shared_state, did_method).await?;
 
     Ok(())
 }
@@ -113,7 +121,7 @@ fn get_ollama_address() -> Result<(String, u16)> {
 pub async fn add_ollama_models(
     host: &str,
     port: u16,
-    config: &mut Config,
+    config: &mut SharedState,
     did_method: &DIDMethods,
 ) -> Result<()> {
     let ollama = Ollama::new(host.to_string(), port);
@@ -128,8 +136,11 @@ pub async fn add_ollama_models(
         .collect::<Vec<String>>();
 
     let mut defaults: Vec<bool> = Vec::new();
-    for model in &multi_select {
-        defaults.push(config.models.contains_key(model));
+    {
+        let models = config.models.lock().await;
+        for model in &multi_select {
+            defaults.push(models.contains_key(model));
+        }
     }
 
     let selected = MultiSelect::with_theme(&ColorfulTheme::default())
@@ -141,16 +152,18 @@ pub async fn add_ollama_models(
         .unwrap();
 
     for s in &selected {
-        config.add_model(
-            &multi_select[*s],
-            OllamaModel::new(
-                host.to_string(),
-                port,
-                &config.mediator_did,
+        config
+            .add_model(
                 &multi_select[*s],
-                did_method,
-            )?,
-        );
+                OllamaModel::new(
+                    host.to_string(),
+                    port,
+                    &config.mediator_did,
+                    &multi_select[*s],
+                    did_method,
+                )?,
+            )
+            .await;
     }
 
     // Check for what we removed
@@ -158,7 +171,7 @@ pub async fn add_ollama_models(
         if e == &true && !selected.contains(&i) {
             // Removing model
             println!("Removing Model {}", multi_select[i]);
-            config.remove_model(&multi_select[i]);
+            config.remove_model(&multi_select[i]).await;
         }
     }
 
