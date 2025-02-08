@@ -149,6 +149,18 @@ where
                             ))
                             .green()
                         );
+                        if message.attachments.is_some() {
+                            warn!("Attachments are not supported");
+                            let _ = send_message(
+                                atm,
+                                profile,
+                                "Unfortunately I can't handle attachments yet.. Hopefully one day I will be able to!",
+                                &from_did,
+                                model,
+                            )
+                            .await;
+                            return Ok(());
+                        }
                         if chat_message.text.starts_with("/") {
                             let _ =
                                 handle_command(atm, profile, &chat_message, model, &from_did).await;
