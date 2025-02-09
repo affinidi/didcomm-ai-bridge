@@ -2,7 +2,7 @@
  * All things to do with state management
  */
 
-use crate::{create_did, DIDMethods};
+use crate::{DIDMethods, create_did};
 use anyhow::{Context, Result};
 use keyring::Entry;
 use serde::{Deserialize, Serialize};
@@ -74,6 +74,8 @@ pub struct DIDCommAgent {
     pub name: String,
     pub greeting: String,
     pub image: String,
+    pub x_meetingplace_contact_attributes: u8,
+    pub x_meetingplace_verification_id: Option<String>,
 }
 
 /// OllamaModel represents a model within the Ollama Service
@@ -108,6 +110,8 @@ impl OllamaModel {
                 greeting: "Standard Greeting".into(),
                 image: "deepseek.png".into(),
                 name: model_name.into(),
+                x_meetingplace_contact_attributes: 8,
+                x_meetingplace_verification_id: None,
             }],
             channel_state: HashMap::new(),
         })

@@ -5,9 +5,9 @@
 use std::{sync::Arc, time::SystemTime};
 
 use affinidi_messaging_didcomm::{Attachment, Message};
-use affinidi_messaging_sdk::{profiles::Profile, protocols::Protocols, ATM};
+use affinidi_messaging_sdk::{ATM, profiles::Profile, protocols::Protocols};
 use anyhow::Result;
-use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
+use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::{info, warn};
@@ -41,7 +41,12 @@ pub struct VCard {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub photo: Option<String>,
     #[serde(rename = "x-meetingplace-contact-attributes")]
-    pub x_meetingplace_contact_attributes: String,
+    pub x_meetingplace_contact_attributes: u8,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "x-meetingplace-verification-id"
+    )]
+    pub x_meetingplace_verification_id: Option<String>,
 }
 
 // Reads a file and returns a BAS64 encoded String
@@ -79,7 +84,8 @@ pub async fn send_connection_response(
             r#type: VcardTypes::Cell(String::new()),
         }),
         photo: Some(photo),
-        x_meetingplace_contact_attributes: "8".to_string(),
+        x_meetingplace_contact_attributes: didcomm_agent.x_meetingplace_contact_attributes,
+        x_meetingplace_verification_id: didcomm_agent.x_meetingplace_verification_id.clone(),
     };
     let vcard = serde_json::to_string(&vcard).unwrap();
     let attachment = Attachment::base64(BASE64_URL_SAFE_NO_PAD.encode(vcard))

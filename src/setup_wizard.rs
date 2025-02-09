@@ -1,9 +1,10 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use console::style;
-use dialoguer::{theme::ColorfulTheme, Input, MultiSelect, Select};
+use dialoguer::{Input, MultiSelect, Select, theme::ColorfulTheme};
 use didcomm_ollama::{
+    DIDMethods,
     agents::state_management::{ConciergeState, DIDCommAgent, OllamaModel, SharedState},
-    create_did, DIDMethods,
+    create_did,
 };
 use ollama_rs::Ollama;
 use regex::Regex;
@@ -24,6 +25,8 @@ pub(crate) async fn run_setup_wizard() -> Result<SharedState> {
                 greeting:
                     "I can help you manage your AI environment? Type /help for more information."
                         .to_string(),
+                x_meetingplace_contact_attributes: 8,
+                x_meetingplace_verification_id: None,
             },
             ..Default::default()
         })),
