@@ -1,5 +1,6 @@
 use affinidi_messaging_didcomm::Message;
-use affinidi_messaging_sdk::{profiles::Profile, protocols::Protocols, ATM};
+use affinidi_messaging_sdk::{ATM, profiles::Profile, protocols::Protocols};
+use anyhow::Result;
 use chrono::Local;
 use serde_json::json;
 use std::{sync::Arc, time::SystemTime};
@@ -8,13 +9,14 @@ use tracing::warn;
 pub mod clear_messages;
 pub mod oob_connection;
 
-pub async fn handle_presence(atm: &ATM, profile: &Arc<Profile>, to_did: &str) {
+pub async fn handle_presence(atm: &ATM, profile: &Arc<Profile>, to_did: &str) -> Result<()> {
     // Create the response message
     // presence timestamp = 2025-02-05T04:59:09.190394Z
     //                      2025-02-05T14:33:37.816332+08:00
     let dt = Local::now();
+    let id = uuid::Uuid::new_v4().to_string();
     let new_message = Message::build(
-        uuid::Uuid::new_v4().to_string(),
+        id.clone(),
         "https://affinidi.com/atm/client-actions/chat-presence".to_string(),
         json!({"presence": dt.to_rfc3339()}),
     )
@@ -35,39 +37,25 @@ pub async fn handle_presence(atm: &ATM, profile: &Arc<Profile>, to_did: &str) {
             Some(&profile.inner.did),
             Some(&profile.inner.did),
         )
-        .await;
+        .await?;
 
-    let protocols = Protocols::default();
-    let forwarded = protocols
-        .routing
-        .forward_message(
-            atm,
-            profile,
-            packed.unwrap().0.as_str(),
-            profile.dids().unwrap().1,
-            to_did,
-            Some(
-                SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs()
-                    + 30,
-            ),
-            None,
-        )
-        .await;
-
-    match atm
-        .send_message(
-            profile,
-            &forwarded.as_ref().unwrap().1,
-            &forwarded.as_ref().unwrap().0,
-            false,
-            true,
-        )
-        .await
-    {
-        Ok(_) => {}
-        Err(e) => warn!("Error Sending Presence: {:#?}", e),
+    if packed.1.messaging_service.is_none() {
+        let _ = atm
+            .forward_and_send_message(
+                profile,
+                &packed.0,
+                None,
+                profile.dids()?.1,
+                to_did,
+                None,
+                None,
+                false,
+            )
+            .await?;
+    } else {
+        let _ = atm
+            .send_message(profile, &packed.0, &id, false, false)
+            .await?;
     }
+    Ok(())
 }
