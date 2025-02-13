@@ -12,8 +12,8 @@ repository = "https://github.com/affinidi/didcomm-ollama"
 publish = true
 
 [dependencies]
-affinidi-messaging-sdk = { version = "0.9", path = "../affinidi/affinidi-messaging/affinidi-messaging-sdk" }
-affinidi-messaging-didcomm = { version = "0.9", path = "../affinidi/affinidi-messaging/affinidi-messaging-didcomm" }
+affinidi-messaging-sdk = { version = "0.9.7" }
+affinidi-messaging-didcomm = { version = "0.9.7" }
 affinidi-did-resolver-cache-sdk = "0.2.8"
 anyhow = "1.0"
 base64 = "0.22"

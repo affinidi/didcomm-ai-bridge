@@ -97,7 +97,9 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-didcomm"
-version = "0.9.7"
+version = "0.9.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8aebf7fa86d513bf50462c73b4f2b391c3ef58eba299c1d4d201da06c6fabab8"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "anyhow",
@@ -120,7 +122,9 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-sdk"
-version = "0.9.7"
+version = "0.9.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b3eafae8e14c3269b9dc316ffba9b8ba04a077e1ac2722af759fcfca9ff59d6"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
