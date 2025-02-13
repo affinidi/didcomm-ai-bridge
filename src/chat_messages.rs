@@ -4,12 +4,12 @@
 
 use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_sdk::{
-    messages::known::MessageType, profiles::Profile,
-    protocols::message_pickup::MessagePickupStatusReply, ATM,
+    ATM, messages::known::MessageType, profiles::Profile,
+    protocols::message_pickup::MessagePickupStatusReply,
 };
 use anyhow::Result;
 use console::style;
-use ollama_rs::{generation::completion::request::GenerationRequest, Ollama};
+use ollama_rs::{Ollama, generation::completion::request::GenerationRequest};
 use serde::{Deserialize, Serialize};
 use sha256::digest;
 use std::{
@@ -18,7 +18,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 use tokio::{
-    io::{stdout, AsyncWriteExt},
+    io::{AsyncWriteExt, stdout},
     select,
     sync::Mutex,
     time::Instant,
@@ -74,13 +74,9 @@ where
         MessageType::MessagePickupStatusResponse => {
             match serde_json::from_value::<MessagePickupStatusReply>(message.body.clone()) {
                 Ok(status) => {
-                    println!(
-                        "{}",
-                        style(format!(
-                            "STATUS: queued messages ({}), live_streaming?({})",
-                            status.message_count, status.live_delivery
-                        ))
-                        .green()
+                    info!(
+                        "STATUS-RESPONSE: queued messages ({}), live_streaming?({})",
+                        status.message_count, status.live_delivery
                     );
                 }
                 Err(e) => {

@@ -13,14 +13,14 @@ use crate::{
     termination::Interrupted,
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
-use affinidi_messaging_sdk::{profiles::Profile, ATM};
+use affinidi_messaging_sdk::{ATM, profiles::Profile};
 use anyhow::Result;
 use sha256::digest;
 use tokio::{
     select,
     sync::{
-        mpsc::{self, UnboundedReceiver, UnboundedSender},
         Mutex,
+        mpsc::{self, UnboundedReceiver, UnboundedSender},
     },
     task::JoinHandle,
 };

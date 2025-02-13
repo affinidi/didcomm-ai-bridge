@@ -28,7 +28,6 @@ keyring = { version = "3.6", features = [
     "windows-native",
     "sync-secret-service",
 ] }
-#ollama-rs = { version = "0.2", features = ["stream"] }
 ollama-rs = { version = "0.2", features = ["stream"] }
 qrcode = "0.14"
 regex = "1.11"
