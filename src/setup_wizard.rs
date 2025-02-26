@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use console::style;
 use dialoguer::{Input, MultiSelect, Select, theme::ColorfulTheme};
-use didcomm_ollama::{
+use didcomm_ai_bridge::{
     DIDMethods,
     agents::state_management::{ConciergeState, DIDCommAgent, OllamaModel, SharedState},
     create_did,

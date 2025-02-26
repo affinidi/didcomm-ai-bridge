@@ -73,33 +73,37 @@ dependencies = [
 
 [[package]]
 name = "affinidi-did-resolver-cache-sdk"
-version = "0.2.9"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa6946fa036abbd25a7fe34c01c1ddf58c2d8db47ead91bf95aecde7f957982b"
+checksum = "083958a57f57857eefa0fed3dacb7f907f037a820eb794ae1b3c547f3da8dc50"
 dependencies = [
+ "base64 0.22.1",
  "blake2",
  "did-peer",
  "futures-util",
  "moka",
  "rand 0.9.0",
+ "rustls 0.23.23",
+ "rustls-platform-verifier",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
+ "sha1",
  "ssi",
  "thiserror 2.0.11",
  "tokio",
- "tokio-tungstenite",
+ "tokio-rustls 0.26.1",
  "tracing",
  "tracing-subscriber",
+ "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "web-socket",
 ]
 
 [[package]]
 name = "affinidi-messaging-didcomm"
-version = "0.9.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8aebf7fa86d513bf50462c73b4f2b391c3ef58eba299c1d4d201da06c6fabab8"
+version = "0.10.0"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "anyhow",
@@ -122,9 +126,7 @@ dependencies = [
 
 [[package]]
 name = "affinidi-messaging-sdk"
-version = "0.9.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b3eafae8e14c3269b9dc316ffba9b8ba04a077e1ac2722af759fcfca9ff59d6"
+version = "0.10.0"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-messaging-didcomm",
@@ -140,16 +142,18 @@ dependencies = [
  "rustls-platform-verifier",
  "serde",
  "serde_json",
+ "sha1",
  "sha256",
  "ssi",
  "thiserror 2.0.11",
  "tokio",
+ "tokio-rustls 0.26.1",
  "tokio-stream",
- "tokio-tungstenite",
  "tracing",
  "tracing-subscriber",
  "url",
  "uuid",
+ "web-socket",
 ]
 
 [[package]]
@@ -1497,9 +1501,9 @@ dependencies = [
 
 [[package]]
 name = "did-peer"
-version = "0.2.9"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9904d409ee31b66c36b45c6bac67b1e3f29a9d6f168e10295cf7e564cde839ae"
+checksum = "cf750ba102547992e2a5c656cec805b235adf584d9b9787c58f67784596ce6c6"
 dependencies = [
  "base64 0.22.1",
  "iref",
@@ -1569,7 +1573,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "didcomm_ollama"
+name = "didcomm_ai-bridge"
 version = "0.1.0"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
@@ -4448,6 +4452,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47796c98c480fce5406ef69d1c76378375492c3b0a0de587be0c1d9feb12f395"
 dependencies = [
  "aws-lc-rs",
+ "log",
  "once_cell",
  "ring",
  "rustls-pki-types",
@@ -6206,24 +6211,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-tungstenite"
-version = "0.26.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be4bf6fecd69fcdede0ec680aaf474cdab988f9de6bc73d3758f0160e3b7025a"
-dependencies = [
- "futures-util",
- "log",
- "native-tls",
- "rustls 0.23.23",
- "rustls-native-certs",
- "rustls-pki-types",
- "tokio",
- "tokio-native-tls",
- "tokio-rustls 0.26.1",
- "tungstenite",
-]
-
-[[package]]
 name = "tokio-util"
 version = "0.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6362,27 +6349,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
-name = "tungstenite"
-version = "0.26.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413083a99c579593656008130e29255e54dcaae495be556cc26888f211648c24"
-dependencies = [
- "byteorder",
- "bytes",
- "data-encoding",
- "http 1.2.0",
- "httparse",
- "log",
- "native-tls",
- "rand 0.8.5",
- "rustls 0.23.23",
- "rustls-pki-types",
- "sha1",
- "thiserror 2.0.11",
- "utf-8",
-]
-
-[[package]]
 name = "typenum"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6452,12 +6418,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "utf-8"
-version = "0.7.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
-
-[[package]]
 name = "utf16_iter"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6483,9 +6443,9 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.13.1"
+version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ced87ca4be083373936a67f8de945faa23b6b42384bd5b64434850802c6dccd0"
+checksum = "93d59ca99a559661b96bf898d8fce28ed87935fd2bea9f05983c1464dd6c71b1"
 dependencies = [
  "getrandom 0.3.1",
  "rand 0.9.0",
@@ -6634,6 +6594,16 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "web-socket"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4202f445611df275891e7575aa91b99ae4bedee6241af7020ce0a3c28cabc449"
+dependencies = [
+ "rand 0.8.5",
+ "tokio",
 ]
 
 [[package]]

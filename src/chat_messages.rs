@@ -127,7 +127,7 @@ where
             }
             "https://affinidi.com/atm/client-actions/chat-presence" => {
                 // Send a presence response back
-                handle_presence(atm, profile, &from_did).await;
+                let _ = handle_presence(atm, profile, &from_did).await;
             }
             "https://affinidi.com/atm/client-actions/chat-effect" => {
                 // Special handling for balloons and confetti

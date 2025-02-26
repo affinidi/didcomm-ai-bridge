@@ -1,11 +1,11 @@
-# DIDComm-Ollama Bridge
+# DIDComm AI Bridge
 
 **IMPORTANT:**
-> DIDComm-Ollama crate is provided "as is" without any warranties or guarantees, and by using this framework, users agree to assume all risks associated with its deployment and use including implementing security, and privacy measures in their applications. Affinidi assumes no liability for any issues arising from the use or modification of the project.
+> didcomm-ai-bridge crate is provided "as is" without any warranties or guarantees, and by using this framework, users agree to assume all risks associated with its deployment and use including implementing security, and privacy measures in their applications. Affinidi assumes no liability for any issues arising from the use or modification of the project.
 
 ## Overview
 
-DIDComm-Ollama Bridge enables a secure and private messaging service that is robust and highly secure, enabling you to chat to your own private personal AI agent from anywhere, from any device.
+DIDComm AI Bridge enables a secure and private messaging service that is robust and highly secure, enabling you to chat to your own private personal AI agent from anywhere, from any device.
 
 ## Is this truly private?
 

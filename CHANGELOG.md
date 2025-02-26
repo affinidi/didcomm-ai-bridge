@@ -1,4 +1,4 @@
-# DIDComm-Ollama Changelog
+# DIDComm-AI-Bridge Changelog
 
 ## Release 0.1.0
 

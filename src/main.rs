@@ -5,17 +5,17 @@
 
 use std::sync::Arc;
 
-use affinidi_messaging_sdk::{config::Config as ATMConfig, profiles::Profile, ATM};
+use affinidi_messaging_sdk::{ATM, config::Config as ATMConfig, profiles::Profile};
 use anyhow::Result;
 use clap::Parser;
 use console::style;
-use didcomm_ollama::{
+use didcomm_ai_bridge::{
     activate::get_secrets,
     agents::{
         concierge::concierge_handler::{Concierge, ConciergeMessage},
         state_management::SharedState,
     },
-    termination::{create_termination, Interrupted},
+    termination::{Interrupted, create_termination},
 };
 use setup_wizard::run_setup_wizard;
 use tokio::{sync::mpsc, try_join};
@@ -117,15 +117,16 @@ async fn main() -> Result<()> {
 
     try_join!(concierge_handle)?;
 
-    match interrupt_rx.recv().await { Ok(reason) => {
-        match reason {
+    match interrupt_rx.recv().await {
+        Ok(reason) => match reason {
             Interrupted::UserInt => info!("exited per user request"),
             Interrupted::OsSigInt => info!("exited because of an os sig int"),
             Interrupted::SystemError => info!("exited because of a system error"),
+        },
+        _ => {
+            println!("exited because of an unexpected error");
         }
-    } _ => {
-        println!("exited because of an unexpected error");
-    }}
+    }
 
     Ok(())
 }
