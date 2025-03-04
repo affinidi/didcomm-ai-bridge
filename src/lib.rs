@@ -1,12 +1,12 @@
 use affinidi_messaging_sdk::secrets::{Secret, SecretType};
 use anyhow::{Context, Result};
-use base64::{prelude::BASE64_STANDARD_NO_PAD, Engine};
+use base64::{Engine, prelude::BASE64_STANDARD_NO_PAD};
 use did_peer::{
     DIDPeer, DIDPeerCreateKeys, DIDPeerKeys, DIDPeerService, PeerServiceEndPoint,
     PeerServiceEndPointLong,
 };
 use keyring::Entry;
-use ssi::{jwk::Params, JWK};
+use ssi::{JWK, jwk::Params};
 
 pub mod activate;
 pub mod agents;
@@ -28,17 +28,23 @@ pub fn create_did(method: &DIDMethods, mediator_did: &str) -> Result<String> {
 
 /// Creates a DID Key to use as the DIDComm agent for a Ollama Model
 fn _create_did_key() -> Result<String> {
-    let p256_key = JWK::generate_p256();
-    let did_key = ssi::dids::DIDKey::generate(&p256_key).unwrap().to_string();
+    let secp256k1_key = JWK::generate_secp256k1();
+    let did_key = ssi::dids::DIDKey::generate(&secp256k1_key)
+        .unwrap()
+        .to_string();
 
     let mut secrets = Vec::new();
-    if let Params::EC(map) = p256_key.params {
+    if let Params::EC(map) = secp256k1_key.params {
         secrets.push(Secret {
             id: [&did_key, "#", &did_key[8..]].concat(),
             type_: SecretType::JsonWebKey2020,
             secret_material: affinidi_messaging_sdk::secrets::SecretMaterial::JWK {
                 private_key_jwk: serde_json::json!({
-                     "crv": map.curve, "kty": "EC", "x": String::from(map.x_coordinate.clone().unwrap()), "y": String::from(map.y_coordinate.clone().unwrap()), "d": String::from(map.ecc_private_key.clone().unwrap())
+                     "crv": map.curve,
+                     "kty": "EC",
+                     "x": String::from(map.x_coordinate.clone().unwrap()),
+                     "y": String::from(map.y_coordinate.clone().unwrap()),
+                     "d": String::from(map.ecc_private_key.clone().unwrap())
                 }),
             },
         });
