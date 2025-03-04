@@ -20,7 +20,7 @@ pub(crate) async fn run_setup_wizard() -> Result<SharedState> {
         concierge: Arc::new(Mutex::new(ConciergeState {
             agent: DIDCommAgent {
                 did: create_did(&did_method, &mediator_did)?,
-                image: "ollmama.png".to_string(),
+                image: "ollama.png".to_string(),
                 name: "AI Concierge".to_string(),
                 greeting:
                     "I can help you manage your AI environment? Type /help for more information."
