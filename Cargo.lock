@@ -163,6 +163,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "ssi",
  "thiserror 2.0.11",
  "tracing",
 ]
@@ -173,6 +174,7 @@ version = "0.1.0"
 dependencies = [
  "affinidi-did-resolver-cache-sdk",
  "affinidi-secrets-resolver",
+ "did-peer 0.4.1",
  "reqwest 0.12.12",
  "serde",
  "serde_json",
