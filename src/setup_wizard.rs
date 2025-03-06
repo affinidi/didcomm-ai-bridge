@@ -50,39 +50,54 @@ pub(crate) async fn add_new_model(
 }
 
 fn get_mediator_did() -> Result<String> {
-    let mediator_did = Input::with_theme(&ColorfulTheme::default())
+    // let mediator_did = Input::with_theme(&ColorfulTheme::default())
+    //     .with_prompt("Mediator DID")
+    //     .default("did:web:mediator-nlb.storm.ws:mediator:v1:.well-known".into())
+    //     .validate_with({
+    //         move |input: &String| -> Result<(), &str> {
+    //             let re = Regex::new(r"did:\w*:\w*").unwrap();
+    //             if re.is_match(input) {
+    //                 Ok(())
+    //             } else {
+    //                 Err("Invalid DID format")
+    //             }
+    //         }
+    //     })
+    //     .interact_text()
+    //     .unwrap();
+
+    // Ok(mediator_did)
+
+    let mediators = [
+        "did:web:mediator-nlb.storm.ws:mediator:v1:.well-known",
+        "did:web:internal-atn-mediator.dev.euw1.affinidi.io:.well-known",
+        "did:web:internal-atn-mediator.dev.apse1.affinidi.io:.well-known",
+    ];
+    let selected = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Mediator DID")
-        .default("did:web:mediator-nlb.storm.ws:mediator:v1:.well-known".into())
-        .validate_with({
-            move |input: &String| -> Result<(), &str> {
-                let re = Regex::new(r"did:\w*:\w*").unwrap();
-                if re.is_match(input) {
-                    Ok(())
-                } else {
-                    Err("Invalid DID format")
-                }
-            }
-        })
-        .interact_text()
+        .default(1)
+        .items(&mediators)
+        .interact()
         .unwrap();
 
-    Ok(mediator_did)
+    Ok(mediators[selected].to_string())
 }
 
 /// Select the DID method to use for generating keys
 fn get_did_method() -> Result<DIDMethods> {
-    let selected = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("DID Method to use for generating keys")
-        .default(1)
-        .items(&["did:key", "did:peer"])
-        .interact()
-        .unwrap();
+    Ok(DIDMethods::Key)
+    // let selected = Select::with_theme(&ColorfulTheme::default())
+    //     .with_prompt("DID Method to use for generating keys")
+    //     .default(1)
+    //     .items(&["did:key", "did:peer"])
+    //     .interact()
+    //     .unwrap();
 
-    if selected == 0 {
-        Ok(DIDMethods::Key)
-    } else {
-        Ok(DIDMethods::Peer)
-    }
+    // if selected == 0 {
+    //     Ok(DIDMethods::Key)
+    // } else {
+    //     Ok(DIDMethods::Peer)
+    // }
 }
 
 /// Get the Ollama address from the user

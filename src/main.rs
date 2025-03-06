@@ -3,7 +3,7 @@
  *
  */
 
-use std::sync::Arc;
+use std::{process, sync::Arc};
 
 use affinidi_messaging_sdk::{ATM, config::ATMConfig, profiles::Profile};
 use anyhow::Result;
@@ -68,7 +68,8 @@ async fn main() -> Result<()> {
                 println!("{}", style("ERROR: No configuration file found.").red());
                 let config = run_setup_wizard().await?;
                 config.save(&config_file).await?;
-                Arc::new(config)
+                println!("New config created, please update it, if needed, and re-run the app");
+                process::exit(0);
             } else {
                 let root_cause = e.root_cause();
                 println!("{}", style(format!("ERROR: {}: {}", e, root_cause)).red());
