@@ -19,7 +19,8 @@ use crate::{
     termination::{Interrupted, Terminator},
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
-use affinidi_messaging_sdk::{profiles::Profile, ATM};
+use affinidi_messaging_sdk::{ATM, profiles::Profile};
+use anyhow::Error;
 use anyhow::Result;
 use console::style;
 use sha256::digest;
@@ -194,14 +195,17 @@ impl Concierge {
                             let _ = send_message(
                                 &self.atm,
                                 &profile,
-                               &didcomm_agent.greeting,
+                                &didcomm_agent.greeting,
                                 &new_did,
                                 &concierge_state,
                             )
-                            .await;
+                            .await
+                            .unwrap_or_else(|error| Self::handle_error(error, message));
                         } else if message.type_ ==  "https://affinidi.com/atm/client-actions/chat-presence" {
                             // Send a presence response back
-                            handle_presence(&self.atm, &profile, &from_did).await;
+                            handle_presence(&self.atm, &profile, &from_did)
+                                .await
+                                .unwrap_or_else(|error| Self::handle_error(error, message));
                         } else if message.type_ ==  "https://affinidi.com/atm/client-actions/chat-delivered" {
                             // Ignore chat delivered messages
                         } else if message.type_ ==  "https://affinidi.com/atm/client-actions/chat-activity" {
@@ -210,14 +214,15 @@ impl Concierge {
                             // Ignore DIDComm status messages
                         } else {
                             info!("Concierge Received Message: {:#?}", message);
-                            let _ = send_message(
+                            send_message(
                                 &self.atm,
                                 &profile,
                                 "I am an unintelligent response from a very intelligent concierge",
                                 message.from.as_ref().unwrap(),
                                 &concierge_state,
                             )
-                            .await;
+                            .await
+                            .unwrap_or_else(|error| Self::handle_error(error, message));
                         }
                 },
                 Ok(interrupted) = interrupt_rx.recv() => {
@@ -237,5 +242,9 @@ impl Concierge {
         self.shared_state.save("config.json").await?;
 
         Ok(result)
+    }
+
+    fn handle_error(error: Error, message: Message) {
+        warn!("Error occurred during {}: {}", message.type_, error)
     }
 }

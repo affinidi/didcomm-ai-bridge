@@ -1,10 +1,9 @@
 use affinidi_messaging_didcomm::Message;
-use affinidi_messaging_sdk::{ATM, profiles::Profile, protocols::Protocols};
+use affinidi_messaging_sdk::{ATM, profiles::Profile};
 use anyhow::Result;
 use chrono::Local;
 use serde_json::json;
 use std::{sync::Arc, time::SystemTime};
-use tracing::warn;
 
 pub mod clear_messages;
 pub mod oob_connection;

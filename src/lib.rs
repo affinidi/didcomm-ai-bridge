@@ -1,4 +1,4 @@
-use affinidi_messaging_sdk::secrets::{Secret, SecretType};
+use affinidi_secrets_resolver::secrets::{Secret, SecretMaterial, SecretType};
 use anyhow::{Context, Result};
 use base64::{Engine, prelude::BASE64_STANDARD_NO_PAD};
 use did_peer::{
@@ -38,7 +38,7 @@ fn _create_did_key() -> Result<String> {
         secrets.push(Secret {
             id: [&did_key, "#", &did_key[8..]].concat(),
             type_: SecretType::JsonWebKey2020,
-            secret_material: affinidi_messaging_sdk::secrets::SecretMaterial::JWK {
+            secret_material: SecretMaterial::JWK {
                 private_key_jwk: serde_json::json!({
                      "crv": map.curve,
                      "kty": "EC",
@@ -103,7 +103,7 @@ fn _create_did_peer(mediator_did: &str) -> Result<String> {
         secrets.push(Secret {
             id: [&did_peer, "#key-1"].concat(),
             type_: SecretType::JsonWebKey2020,
-            secret_material: affinidi_messaging_sdk::secrets::SecretMaterial::JWK {
+            secret_material: SecretMaterial::JWK {
                 private_key_jwk: serde_json::json!({
                      "crv": map.curve, "kty": "OKP", "x": String::from(map.public_key.clone()), "d": String::from(map.private_key.clone().unwrap())}
                 ),
@@ -115,7 +115,7 @@ fn _create_did_peer(mediator_did: &str) -> Result<String> {
         secrets.push(Secret {
             id: [&did_peer, "#key-2"].concat(),
             type_: SecretType::JsonWebKey2020,
-            secret_material: affinidi_messaging_sdk::secrets::SecretMaterial::JWK {
+            secret_material: SecretMaterial::JWK {
                 private_key_jwk: serde_json::json!({
                      "crv": map.curve, "kty": "EC", "x": String::from(map.x_coordinate.clone().unwrap()), "y": String::from(map.y_coordinate.clone().unwrap()), "d": String::from(map.ecc_private_key.clone().unwrap())
                 }),
