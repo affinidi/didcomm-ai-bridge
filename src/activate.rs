@@ -4,9 +4,10 @@
 
 use std::sync::Arc;
 
-use affinidi_messaging_sdk::{profiles::Profile, secrets::Secret, ATM};
+use affinidi_messaging_sdk::{ATM, profiles::Profile};
+use affinidi_tdk::secrets_resolver::secrets::Secret;
 use anyhow::Result;
-use base64::{prelude::BASE64_STANDARD_NO_PAD, Engine};
+use base64::{Engine, prelude::BASE64_STANDARD_NO_PAD};
 use console::style;
 use keyring::Entry;
 use tokio::sync::Mutex;

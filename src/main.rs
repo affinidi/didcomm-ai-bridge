@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use affinidi_messaging_sdk::{ATM, config::Config as ATMConfig, profiles::Profile};
+use affinidi_messaging_sdk::{ATM, config::ATMConfig, profiles::Profile};
 use anyhow::Result;
 use clap::Parser;
 use console::style;
