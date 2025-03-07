@@ -13,10 +13,10 @@ publish = true
 resolver = "3"
 
 [dependencies]
-affinidi-messaging-sdk = { version = "0.10.0", path = "../affinidi/affinidi-messaging/affinidi-messaging-sdk" }
-affinidi-messaging-didcomm = { version = "0.10.0", path = "../affinidi/affinidi-messaging/affinidi-messaging-didcomm" }
+affinidi-messaging-sdk = { version = "0.10.0", path = "../affinidi-messaging/affinidi-messaging-sdk" }
+affinidi-messaging-didcomm = { version = "0.10.0", path = "../affinidi-messaging/affinidi-messaging-didcomm" }
 affinidi-did-resolver-cache-sdk = "0.4"
-affinidi-tdk = { version = "0.1", path = "../affinidi/affinidi-tdk-rs/affinidi-tdk" }
+affinidi-tdk = { version = "0.1", path = "../affinidi-tdk-rs/affinidi-tdk" }
 anyhow = "1.0"
 base64 = "0.22"
 chrono = { version = "0.4.40", features = ["alloc"] }
