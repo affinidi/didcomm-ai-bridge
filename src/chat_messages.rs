@@ -4,7 +4,7 @@
 
 use affinidi_messaging_didcomm::Message;
 use affinidi_messaging_sdk::{
-    ATM, messages::known::MessageType, profiles::Profile,
+    ATM, messages::known::MessageType, profiles::ATMProfile,
     protocols::message_pickup::MessagePickupStatusReply,
 };
 use anyhow::Result;
@@ -45,7 +45,7 @@ struct ChatEffect {
 /// Doesn't return anything
 pub(crate) async fn handle_message<T>(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     model: &Arc<Mutex<T>>,
     model_name: &str,
     message: &Message,
@@ -197,7 +197,7 @@ where
 
 pub(crate) async fn handle_chat_effect<T>(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     model: &Arc<Mutex<T>>,
     message: &Message,
 ) where
@@ -241,7 +241,7 @@ pub(crate) async fn handle_chat_effect<T>(
 /// Handles a command message
 async fn handle_command<T>(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     chat_message: &ChatMessage,
     model: &Arc<Mutex<T>>,
     remote_did: &str,
@@ -277,7 +277,7 @@ where
 /// Handles a prompt message
 async fn handle_prompt<T>(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     chat_message: &ChatMessage,
     model: &Arc<Mutex<T>>,
     to_did: &str,
@@ -379,7 +379,7 @@ where
 
 pub async fn send_message<T>(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     text: &str,
     to_did: &str,
     channel_state: &Arc<Mutex<T>>,
@@ -443,7 +443,7 @@ where
     Ok(())
 }
 
-async fn ack_message(atm: &ATM, profile: &Arc<Profile>, message: &Message) -> Result<()> {
+async fn ack_message(atm: &ATM, profile: &Arc<ATMProfile>, message: &Message) -> Result<()> {
     let Some(from_did) = message.from.clone() else {
         println!("{}", style("No 'from' field in message").red());
         println!(
@@ -501,7 +501,7 @@ async fn ack_message(atm: &ATM, profile: &Arc<Profile>, message: &Message) -> Re
 
 async fn i_am_thinking<T>(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     channel_state: &Arc<Mutex<T>>,
     to_did: &str,
 ) -> Result<()>

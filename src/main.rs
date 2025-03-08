@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use affinidi_messaging_sdk::{ATM, config::ATMConfig, profiles::Profile};
+use affinidi_messaging_sdk::{ATM, config::ATMConfig, profiles::ATMProfile};
 use anyhow::Result;
 use clap::Parser;
 use console::style;
@@ -91,13 +91,13 @@ async fn main() -> Result<()> {
 
     let concierge_profile = {
         let concierge_did = config.concierge.lock().await.agent.did.clone();
+        atm.add_secrets(&get_secrets(&concierge_did)?).await;
 
-        Profile::new(
+        ATMProfile::new(
             &atm,
             Some("Affinidi Concierge".into()),
             concierge_did.to_string(),
             Some(config.mediator_did.to_string()),
-            get_secrets(&concierge_did)?,
         )
         .await?
     };
