@@ -4,8 +4,8 @@
 
 use std::sync::Arc;
 
-use affinidi_messaging_sdk::{ATM, profiles::Profile};
-use affinidi_secrets_resolver::secrets::Secret;
+use affinidi_messaging_sdk::{ATM, profiles::ATMProfile};
+use affinidi_tdk::secrets_resolver::secrets::Secret;
 use anyhow::Result;
 use base64::{Engine, prelude::BASE64_STANDARD_NO_PAD};
 use console::style;
@@ -20,18 +20,18 @@ pub async fn create_model_profiles(
     model_name: &str,
     model: &Arc<Mutex<OllamaModel>>,
     mediator_did: &str,
-) -> Result<Vec<Profile>> {
+) -> Result<Vec<ATMProfile>> {
     let model = model.lock().await;
     let mut profiles = Vec::new();
     for did in &model.dids {
-        let secrets = get_secrets(&did.did)?;
+        atm.add_secrets(&get_secrets(&did.did)?).await;
+
         profiles.push(
-            Profile::new(
+            ATMProfile::new(
                 atm,
                 Some(model_name.to_string()),
                 did.did.clone(),
                 Some(mediator_did.to_string()),
-                secrets,
             )
             .await?,
         );

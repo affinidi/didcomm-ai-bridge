@@ -1,5 +1,5 @@
 use affinidi_messaging_didcomm::Message;
-use affinidi_messaging_sdk::{ATM, profiles::Profile};
+use affinidi_messaging_sdk::{ATM, profiles::ATMProfile};
 use anyhow::Result;
 use chrono::Local;
 use serde_json::json;
@@ -8,7 +8,7 @@ use std::{sync::Arc, time::SystemTime};
 pub mod clear_messages;
 pub mod oob_connection;
 
-pub async fn handle_presence(atm: &ATM, profile: &Arc<Profile>, to_did: &str) -> Result<()> {
+pub async fn handle_presence(atm: &ATM, profile: &Arc<ATMProfile>, to_did: &str) -> Result<()> {
     // Create the response message
     // presence timestamp = 2025-02-05T04:59:09.190394Z
     //                      2025-02-05T14:33:37.816332+08:00

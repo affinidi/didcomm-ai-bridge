@@ -5,7 +5,7 @@
 use std::{sync::Arc, time::SystemTime};
 
 use affinidi_messaging_didcomm::{Attachment, Message};
-use affinidi_messaging_sdk::{ATM, profiles::Profile, protocols::Protocols};
+use affinidi_messaging_sdk::{ATM, profiles::ATMProfile, protocols::Protocols};
 use anyhow::Result;
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
@@ -57,7 +57,7 @@ fn _read_file(path: &str) -> String {
 
 pub async fn send_connection_response(
     atm: &ATM,
-    profile: &Arc<Profile>,
+    profile: &Arc<ATMProfile>,
     message: &Message,
     didcomm_agent: &DIDCommAgent,
 ) -> Result<String> {

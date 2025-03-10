@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use affinidi_messaging_sdk::{
-    messages::{fetch::FetchOptions, DeleteMessageRequest, FetchDeletePolicy, Folder},
-    profiles::Profile,
     ATM,
+    messages::{DeleteMessageRequest, FetchDeletePolicy, Folder, fetch::FetchOptions},
+    profiles::ATMProfile,
 };
 use anyhow::Result;
 use tracing::info;
 
-pub async fn clear_inbound_messages(atm: &ATM, profile: &Arc<Profile>) -> Result<()> {
+pub async fn clear_inbound_messages(atm: &ATM, profile: &Arc<ATMProfile>) -> Result<()> {
     // Clear out the inbox queue in case old questions have been queued up
     let mut deleted = 0;
     loop {
@@ -37,7 +37,7 @@ pub async fn clear_inbound_messages(atm: &ATM, profile: &Arc<Profile>) -> Result
     Ok(())
 }
 
-pub async fn clear_outbound_messages(atm: &ATM, profile: &Arc<Profile>) -> Result<()> {
+pub async fn clear_outbound_messages(atm: &ATM, profile: &Arc<ATMProfile>) -> Result<()> {
     // Clear out the outbox queue in case old questions have been queued up
     let mut deleted = 0;
     loop {

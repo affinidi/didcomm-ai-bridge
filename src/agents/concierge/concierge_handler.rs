@@ -19,8 +19,7 @@ use crate::{
     termination::{Interrupted, Terminator},
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
-use affinidi_messaging_sdk::{ATM, profiles::Profile};
-use anyhow::Error;
+use affinidi_messaging_sdk::{ATM, profiles::ATMProfile};
 use anyhow::Result;
 use console::style;
 use sha256::digest;
@@ -80,7 +79,7 @@ impl Concierge {
     /// Run the Concierge Task
     pub async fn run(
         mut self,
-        profile: Profile,
+        profile: ATMProfile,
         mut terminator: Terminator,
         mut interrupt_rx: broadcast::Receiver<Interrupted>,
     ) -> Result<Interrupted> {
@@ -203,9 +202,7 @@ impl Concierge {
                             .unwrap_or_else(|error| Self::handle_error(error, message));
                         } else if message.type_ ==  "https://affinidi.com/atm/client-actions/chat-presence" {
                             // Send a presence response back
-                            handle_presence(&self.atm, &profile, &from_did)
-                                .await
-                                .unwrap_or_else(|error| Self::handle_error(error, message));
+                            let _ = handle_presence(&self.atm, &profile, &from_did).await;
                         } else if message.type_ ==  "https://affinidi.com/atm/client-actions/chat-delivered" {
                             // Ignore chat delivered messages
                         } else if message.type_ ==  "https://affinidi.com/atm/client-actions/chat-activity" {

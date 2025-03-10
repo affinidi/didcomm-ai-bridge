@@ -13,7 +13,7 @@ use crate::{
     termination::Interrupted,
 };
 use affinidi_messaging_didcomm::{Message, UnpackMetadata};
-use affinidi_messaging_sdk::{ATM, profiles::Profile};
+use affinidi_messaging_sdk::{ATM, profiles::ATMProfile};
 use anyhow::Result;
 use sha256::digest;
 use tokio::{
@@ -63,7 +63,7 @@ impl ModelAgent {
         }
     }
 
-    pub async fn start(self, profiles: Vec<Profile>) -> Result<JoinHandle<()>> {
+    pub async fn start(self, profiles: Vec<ATMProfile>) -> Result<JoinHandle<()>> {
         let agent = ModelAgent {
             atm: self.atm.clone(),
             concierge_tx: self.concierge_tx.clone(),
@@ -79,12 +79,12 @@ impl ModelAgent {
     }
 
     /// Run the Model Agent
-    async fn run(mut self, profiles: Vec<Profile>) -> Result<Interrupted> {
+    async fn run(mut self, profiles: Vec<ATMProfile>) -> Result<Interrupted> {
         let model_name = { self.model.lock().await.name.clone() };
         let (direct_tx, mut direct_rx) = mpsc::channel::<Box<(Message, UnpackMetadata)>>(32);
 
         info!("Model ({}) starting...", model_name);
-        let mut activated_profiles: HashMap<String, Arc<Profile>> = HashMap::new();
+        let mut activated_profiles: HashMap<String, Arc<ATMProfile>> = HashMap::new();
         for profile in profiles {
             let model_profile = self.atm.profile_add(&profile, false).await?;
             activated_profiles.insert(profile.inner.did.clone(), model_profile.clone());

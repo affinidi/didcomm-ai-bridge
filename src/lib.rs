@@ -1,4 +1,4 @@
-use affinidi_secrets_resolver::secrets::{Secret, SecretMaterial, SecretType};
+use affinidi_tdk::secrets_resolver::secrets::{Secret, SecretMaterial, SecretType};
 use anyhow::{Context, Result};
 use base64::{Engine, prelude::BASE64_STANDARD_NO_PAD};
 use did_peer::{
