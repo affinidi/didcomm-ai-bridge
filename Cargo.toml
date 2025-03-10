@@ -15,13 +15,8 @@ resolver = "3"
 [dependencies]
 affinidi-messaging-sdk = { version = "0.10.0", path = "../affinidi-messaging/affinidi-messaging-sdk" }
 affinidi-messaging-didcomm = { version = "0.10.0", path = "../affinidi-messaging/affinidi-messaging-didcomm" }
-<<<<<<< HEAD
-affinidi-did-resolver-cache-sdk = "0.4.1"
-affinidi-secrets-resolver = { version = "0.1", path = "../affinidi-tdk-rs/affinidi-tdk-common/affinidi-secrets-resolver" }
-=======
 affinidi-did-resolver-cache-sdk = "0.4"
 affinidi-tdk = { version = "0.1", path = "../affinidi-tdk-rs/affinidi-tdk" }
->>>>>>> main
 anyhow = "1.0"
 base64 = "0.22"
 chrono = { version = "0.4.40", features = ["alloc"] }
