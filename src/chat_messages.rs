@@ -174,6 +174,9 @@ where
                     }
                 }
             }
+            "https://affinidi.com/atm/client-actions/chat-alias-profile-hash" => {
+                // Ignore this
+            }
             "https://affinidi.com/atm/client-actions/chat-delivered" => {
                 // Ignore this, it is the other client acknowledging receipt of a message
             }
@@ -408,6 +411,7 @@ where
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_secs()
+            // added to avoid MP chat sorting "issues"
             + 2,
     )
     .from(profile.inner.did.clone())
