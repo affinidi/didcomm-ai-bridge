@@ -124,6 +124,7 @@ async fn main() -> Result<()> {
             additional_secrets.push(model_secret);
         }
     }
+    println!("additional_secrets: {}", additional_secrets.len());
     tdk.secrets_resolver.insert_vec(&additional_secrets).await;
 
     // Create a new ATM Client

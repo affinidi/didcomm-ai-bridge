@@ -6,13 +6,12 @@ use affinidi_tdk::secrets_resolver::secrets::Secret;
 use anyhow::Result;
 use base64::{Engine, prelude::BASE64_STANDARD_NO_PAD};
 use console::style;
-use keyring::Entry;
+
+use crate::get_did_secret;
 
 /// Retrieves secrets for a DID from the keyring
 pub fn get_secrets(did: &str) -> Result<Vec<Secret>> {
-    // Fetch the secret from keyring
-    let entry = Entry::new("didcomm-ollama", did)?;
-    let raw_secrets = match entry.get_secret() {
+    let raw_secrets = match get_did_secret(did) {
         Ok(secret) => secret,
         Err(e) => {
             println!(
