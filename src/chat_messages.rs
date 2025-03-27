@@ -174,6 +174,9 @@ where
                     }
                 }
             }
+            "https://affinidi.com/atm/client-actions/chat-alias-profile-hash" => {
+                // Ignore this
+            }
             "https://affinidi.com/atm/client-actions/chat-delivered" => {
                 // Ignore this, it is the other client acknowledging receipt of a message
             }
@@ -312,7 +315,7 @@ where
     stdout.write_all(b"\n> ").await?;
     stdout.flush().await?;
 
-    let mut think_flag = true;
+    let mut think_flag = false;
     let mut output = String::new();
 
     let timeout: tokio::time::Sleep = tokio::time::sleep(Duration::from_secs(30));
@@ -407,7 +410,9 @@ where
         SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
-            .as_secs(),
+            .as_secs()
+            // added to avoid MP chat sorting "issues"
+            + 2,
     )
     .from(profile.inner.did.clone())
     .to(to_did.to_string())

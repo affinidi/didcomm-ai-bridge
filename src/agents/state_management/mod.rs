@@ -2,9 +2,8 @@
  * All things to do with state management
  */
 
-use crate::{DIDMethods, create_did};
+use crate::{DIDMethods, create_did, delete_did_secret};
 use anyhow::{Context, Result};
-use keyring::Entry;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, sync::Arc};
 use tokio::sync::Mutex as TokioMutex;
@@ -174,8 +173,7 @@ impl SharedState {
             // Clean up secret keys
             let lock = model.lock().await;
             for did in &lock.dids {
-                let event = Entry::new("didcomm-ollama", &did.did).unwrap();
-                let _ = event.delete_credential();
+                let _ = delete_did_secret(&did.did);
             }
         }
     }

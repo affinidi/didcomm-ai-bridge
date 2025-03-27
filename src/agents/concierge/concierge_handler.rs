@@ -5,7 +5,6 @@
  */
 
 use crate::{
-    activate::create_model_profiles,
     agents::{
         model::{ModelAction, ModelAgent},
         state_management::{ChannelState, ChatChannelState, SharedState, SharedStateRef},
@@ -45,8 +44,6 @@ pub struct Concierge {
     atm: ATM,
     /// Channel that concierge uses to receive messages from other tasks
     to_concierge_channel: UnboundedReceiver<ConciergeMessage>,
-    /// Mediator DID
-    mediator_did: String,
     /// Shared State
     shared_state: SharedStateRef,
 }
@@ -68,7 +65,6 @@ impl Concierge {
         (
             Self {
                 atm,
-                mediator_did: config.mediator_did.clone(),
                 to_concierge_channel: to_concierge,
                 shared_state: config,
             },
@@ -79,11 +75,12 @@ impl Concierge {
     /// Run the Concierge Task
     pub async fn run(
         mut self,
-        profile: ATMProfile,
+        concierge_profile: ATMProfile,
+        model_profiles: HashMap<String, Vec<ATMProfile>>,
         mut terminator: Terminator,
         mut interrupt_rx: broadcast::Receiver<Interrupted>,
     ) -> Result<Interrupted> {
-        let profile = self.atm.profile_add(&profile, false).await?;
+        let profile = self.atm.profile_add(&concierge_profile, false).await?;
         let _ = clear_inbound_messages(&self.atm, &profile).await;
         let _ = clear_outbound_messages(&self.atm, &profile).await;
 
@@ -128,17 +125,19 @@ impl Concierge {
                         model.clone()
                     };
                     info!("Starting Model: {:?}", model_name);
-                    let model_profiles = create_model_profiles(&self.atm, &model_name, &model, &self.mediator_did).await?;
-                    //let model_profile = self.atm.profile_add(&model_profile, false).await?;
-                    // Channel to communicate with the model
-                    let (to_model, from_concierge) = mpsc::unbounded_channel::<ModelAction>();
+                    match model_profiles.get(&model_name) {
+                        Some(model_profiles) => {
+                            // Channel to communicate with the model
+                            let (to_model, from_concierge) = mpsc::unbounded_channel::<ModelAction>();
+                            let model_agent = ModelAgent::new(self.atm.clone(), model.clone(), from_concierge, to_concierge_from_models.clone());
+                            info!("Model Agent new: {}", &model_name);
+                            model_agent.start(model_profiles.to_owned()).await?;
 
-                    let model_agent = ModelAgent::new(self.atm.clone(), model.clone(), from_concierge, to_concierge_from_models.clone());
-                    info!("Model Agent new: {}", &model_name);
-                    model_agent.start(model_profiles).await?;
-
-                    info!("After run(): {}", &model_name);
-                    models.insert(model_name.clone(), Model {  tx_channel: to_model});
+                            info!("After run(): {}", &model_name);
+                            models.insert(model_name.clone(), Model {  tx_channel: to_model});
+                        },
+                        None => println!("No model_profiles found for {model_name}.")
+                    }
                 }
             },
                 Some(boxed_data) = direct_rx.recv() => {
@@ -162,6 +161,8 @@ impl Concierge {
                                 concierge_state.insert_channel_state(&from_did_hash, remote_state);
                             }
                         }
+
+                        info!("Concierge Received Message: message.type_ = {:#?}", message.type_);
 
                         if message.type_ == "https://affinidi.com/atm/client-actions/connection-setup" {
                             info!(
@@ -194,7 +195,7 @@ impl Concierge {
                             let _ = send_message(
                                 &self.atm,
                                 &profile,
-                               &didcomm_agent.greeting,
+                                &didcomm_agent.greeting,
                                 &new_did,
                                 &concierge_state,
                             )

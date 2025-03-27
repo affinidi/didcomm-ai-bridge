@@ -1,6 +1,7 @@
 use affinidi_tdk::secrets_resolver::secrets::{Secret, SecretMaterial, SecretType};
 use anyhow::{Context, Result};
 use base64::{Engine, prelude::BASE64_STANDARD_NO_PAD};
+use console::style;
 use did_peer::{
     DIDPeer, DIDPeerCreateKeys, DIDPeerKeys, DIDPeerService, PeerServiceEndPoint,
     PeerServiceEndPointLong,
@@ -14,6 +15,8 @@ pub mod chat_messages;
 pub mod didcomm_messages;
 pub mod termination;
 
+const DIDCOMM_AI_BRIDGE_KEYRING_SERVICE_NAME: &str = "didcomm-ai-bridge";
+
 pub enum DIDMethods {
     Key,
     Peer,
@@ -24,6 +27,28 @@ pub fn create_did(method: &DIDMethods, mediator_did: &str) -> Result<String> {
         DIDMethods::Key => _create_did_key(),
         DIDMethods::Peer => _create_did_peer(mediator_did),
     }
+}
+
+// Fetches the secret from keyring
+pub fn get_did_secret(did: &str) -> Result<Vec<u8>> {
+    let entry = Entry::new(DIDCOMM_AI_BRIDGE_KEYRING_SERVICE_NAME, did)?;
+    match entry.get_secret() {
+        Ok(secret) => Ok(secret),
+        Err(e) => {
+            println!(
+                "{}",
+                style(format!("ERROR: Couldn't get secret for {}: {}", did, e)).red()
+            );
+            return Err(e.into());
+        }
+    }
+}
+
+// Deletes the secret from keyring
+pub fn delete_did_secret(did: &str) -> Result<()> {
+    let event = Entry::new(DIDCOMM_AI_BRIDGE_KEYRING_SERVICE_NAME, did).unwrap();
+    let _ = event.delete_credential();
+    Ok(())
 }
 
 /// Creates a DID Key to use as the DIDComm agent for a Ollama Model
@@ -50,7 +75,7 @@ fn _create_did_key() -> Result<String> {
         });
     }
 
-    let entry = Entry::new("didcomm-ollama", &did_key)?;
+    let entry = Entry::new(DIDCOMM_AI_BRIDGE_KEYRING_SERVICE_NAME, &did_key)?;
     entry.set_secret(
         BASE64_STANDARD_NO_PAD
             .encode(serde_json::to_string(&secrets).unwrap().as_bytes())
@@ -60,7 +85,7 @@ fn _create_did_key() -> Result<String> {
     Ok(did_key)
 }
 
-/// Creates a DID Peer to use as the DIDComm agent for a Ollama Model
+/// Creates a DID Peer to use as the DIDComm agent for a LLM
 fn _create_did_peer(mediator_did: &str) -> Result<String> {
     let e_secp256k1_key = JWK::generate_secp256k1();
     let v_ed25519_key = JWK::generate_ed25519().unwrap();
@@ -123,7 +148,7 @@ fn _create_did_peer(mediator_did: &str) -> Result<String> {
         });
     }
 
-    let entry = Entry::new("didcomm-ollama", &did_peer)?;
+    let entry = Entry::new(DIDCOMM_AI_BRIDGE_KEYRING_SERVICE_NAME, &did_peer)?;
     entry.set_secret(
         BASE64_STANDARD_NO_PAD
             .encode(serde_json::to_string(&secrets).unwrap().as_bytes())
